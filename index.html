@@ -204,6 +204,9 @@ nav.bn button[aria-selected="true"]::after{content:"";position:absolute;top:0;le
 .mbar div{height:100%}
 .mleg{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:12px;color:var(--soft);margin-top:6px}
 .mleg i{display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:5px}
+.tatchip[aria-pressed="false"]{border-color:#C04FD6;color:#C04FD6}
+.tatnote{display:flex;gap:12px;align-items:center;background:linear-gradient(135deg,#FF5C9E22,#3E7BFF22);border:1px solid #C04FD655;border-radius:16px;padding:12px 14px;margin-top:14px}
+.tatnote>span{font-size:22px}.tatnote b{display:block;font-size:15px}.tatnote small{color:var(--soft);font-size:12px}
 /* rings */
 .rings{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
 .ring{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:14px;text-align:center}
@@ -296,7 +299,7 @@ footer{margin-top:30px;font-size:12px;color:var(--soft);text-align:center}
 <div class="tab" id="t-metas"></div>
 <div class="tab" id="t-negocios"></div>
 
-<footer>Pra planejar e acompanhar. Não é consultoria financeira.<br><span style="opacity:.6">versão 25/09 · 2</span></footer>
+<footer>Pra planejar e acompanhar. Não é consultoria financeira.<br><span style="opacity:.6">versão 25/09 · 3</span></footer>
 </main>
 
 <nav class="bn"><div class="in" role="tablist">
@@ -458,7 +461,9 @@ const mshort=k=>{const[y,m]=k.split("-");return new Date(+y,+m-1,1).toLocaleDate
 const shiftM=(k,n)=>{const[y,m]=k.split("-").map(Number);const d=new Date(y,m-1+n,1);return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")};
 const dBR=d=>(d||"").split("-").reverse().slice(0,2).join("/");
 const conta=id=>S.contas.find(c=>c.id===id);
-const cat=n=>S.cats.find(c=>c.n===n)||{n:n||"Sem categoria",e:"•",c:"#8C82A8"};
+const TATCAT={n:"Frana Tattoo",e:"🖋️",c:"#C04FD6"};
+const cat=n=>n===TATCAT.n?TATCAT:(S.cats.find(c=>c.n===n)||{n:n||"Sem categoria",e:"•",c:"#8C82A8"});
+const ehTattoo=g=>g.cat===TATCAT.n;
 const sum=(a,f=x=>x)=>a.reduce((t,x)=>t+(+f(x)||0),0);
 const formaNome=f=>f==="cartao"?"Cartão Sicredi":(conta(f)?.nome||"—");
 const formaCor=f=>f==="cartao"?"#7B5CF0":(conta(f)?.cor||"#8C82A8");
@@ -510,8 +515,9 @@ function tatSaldo(){
 const tatDeveTotal=()=>sum(FR.reembolsos,r=>Math.max(0,(+r.value||0)-tatPago(r)));
 const tatRecebidoMes=k=>sum(FR.tattoos.filter(t=>(t.date||"").slice(0,7)===k),t=>t.received);
 const tatRecebido=()=>sum(FR.tattoos,t=>t.received);
+const gastosPessoais=k=>gastosMes(k).filter(g=>!ehTattoo(g));
 function porCategoria(k){
-  const m={}; gastosMes(k).forEach(g=>{m[g.cat||"Outros"]=(m[g.cat||"Outros"]||0)+(+g.valor||0)});
+  const m={}; gastosPessoais(k).forEach(g=>{m[g.cat||"Outros"]=(m[g.cat||"Outros"]||0)+(+g.valor||0)});
   return Object.entries(m).sort((a,b)=>b[1]-a[1]);
 }
 function metaInfo(m){
@@ -551,7 +557,7 @@ const monthNav=(k,id)=>`<div class="monthnav"><button data-act="mes" data-w="${i
 /* ================= TELAS ================= */
 function rInicio(){
   const virt=saldoVirtual(), fis=saldoFisico(), pend=pendentes(curHome), pendT=sum(pend,p=>p.valor);
-  const gTot=sum(gastosMes(curHome),g=>g.valor), tarT=sum(S.tarot,t=>t.valor), ts=tatSaldo(), deve=tatDeve(curHome);
+  const gTot=sum(gastosPessoais(curHome),g=>g.valor), tarT=sum(S.tarot,t=>t.valor), ts=tatSaldo(), deve=tatDeve(curHome);
   $("t-inicio").innerHTML=`
   ${INBOX.length?`<button class="inboxbtn" data-act="inbox"><span>📲</span><span style="flex:1"><b>${INBOX.length} ${INBOX.length===1?"gasto":"gastos"} da Carteira</b><small>toque pra classificar</small></span><span class="num" style="font-weight:800">${brl(sum(INBOX,x=>x.valor))} ›</span></button>`:""}
   <div class="hero"><small>Saldo pessoal</small><div class="big">${brl(virt+fis)}</div>
@@ -559,7 +565,7 @@ function rInicio(){
   ${monthNav(curHome,"home")}
   <button class="paybtn" style="border-color:var(--mint-bg)" data-act="go" data-tab="gastos">
     <span class="pi" style="background:var(--mint-bg)">🧾</span><span class="pt"><small>Gastos em ${mshort(curHome)}</small><b>${brl(gTot)}</b></span>
-    <span class="pc" style="color:var(--mint)">${gastosMes(curHome).length} lançamentos ›</span>
+    <span class="pc" style="color:var(--mint)">${gastosPessoais(curHome).length} lançamentos ›</span>
   </button>
   <button class="paybtn" data-act="listaPagar">
     <span class="pi">⏳</span><span class="pt"><small>Pra pagar em ${mshort(curHome)}</small><b>${brl(pendT)}</b></span>
@@ -590,6 +596,7 @@ function rGastos(){
   ${INBOX.length?`<h2 style="display:flex;justify-content:space-between;align-items:baseline">📲 Pra classificar <span class="muted num" style="font-family:var(--body);font-weight:600">${brl(sum(INBOX,x=>x.valor))}</span></h2>
   <div class="card" style="border-color:var(--violet)">${[...INBOX].sort((a,b)=>(b.criado_em||"").localeCompare(a.criado_em||"")).map(x=>`<div class="item"><div class="dot" style="background:var(--violet-bg)">💳</div><button class="tx" data-act="classificar" data-id="${x.id}" style="border:0;background:transparent;text-align:left;color:var(--ink);font-family:var(--body);cursor:pointer;padding:0"><div>${esc(x.lugar||"Compra")}</div><span class="muted">${new Date(x.criado_em).toLocaleString("pt-BR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"})}</span>${pareceFixo(x)?`<span class="pill warn" style="margin-top:4px">parece o fixo ${esc(pareceFixo(x)[0])}</span>`:""}</button><span class="val">${brl(x.valor)}</span><span class="chev">›</span></div>`).join("")}<p class="muted" style="margin:6px 0 0;font-size:12px">Toque numa compra pra escolher a categoria.</p></div>`:""}
   ${monthNav(curG,"gastos")}
+  ${(()=>{const tg=gastosMes(curG).filter(ehTattoo);return tg.length?`<div class="tatnote"><span>🖋️</span><div style="flex:1"><b>Compras da tattoo · ${brl(sum(tg,g=>g.valor))}</b><small>${tg.length} ${tg.length===1?"compra":"compras"} no mês · não contam nos teus gastos, a tattoo te devolve</small></div></div>`:""})()}
   <h2 style="margin-top:6px">Por categoria</h2>
   ${tot>0?`<div class="card donutbox" style="margin-bottom:10px">${donut(pc.map(([n,v])=>[cat(n).c,v]),150,24,`<text x="75" y="70" text-anchor="middle" font-size="12" fill="var(--soft)" font-family="Figtree,sans-serif">total</text><text x="75" y="90" text-anchor="middle" font-size="17" font-weight="800" fill="var(--ink)" font-family="Bricolage Grotesque,sans-serif">${brl0(tot)}</text>`)}
      <div class="legend">${pc.map(([n,v])=>`<div><i style="background:${cat(n).c}"></i><span>${cat(n).e} ${esc(n)}</span><b class="num">${Math.round(v/tot*100)}%</b></div>`).join("")}</div></div>`:""}
@@ -715,7 +722,7 @@ function rNegocios(){
     ${meses.length?meses.map(k=>{const it=grupos[k],tot=sum(it,r=>r.value),falta=sum(it,r=>Math.max(0,(+r.value||0)-tatPago(r)));
       return `<div class="card" style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;align-items:baseline"><h3>${mfull(k)}</h3><span class="pill ${falta<=0.004?"ok":"warn"}">${falta<=0.004?"Quitado":"Falta "+brl(falta)}</span></div>
       <div class="pbar"><div style="width:${tot?(tot-falta)/tot*100:0}%;background:var(--mint)"></div></div>
-      ${it.map(r=>{const f=Math.max(0,(+r.value||0)-tatPago(r));return `<div class="item" style="padding:9px 0"><div class="tx"><div style="font-weight:500">${esc(r.desc)}</div><span class="muted">vence ${dBR(r.date)}${r.origem==="estoque"?" · estoque":""}${tatPago(r)>0&&f>0.004?` · pagou ${brl(tatPago(r))}, falta ${brl(f)}`:""}</span></div><span class="val">${brl(r.value)}</span>${f<=0.004?`<span class="pill ok">Pago</span>`:tatPago(r)>0?`<span class="pill warn">Parcial</span>`:`<span class="pill bad">Pendente</span>`}</div>`}).join("")}</div>`}).join(""):`<div class="card empty">A tattoo não te deve nada 🎉</div>`}
+      ${it.map(r=>{const f=Math.max(0,(+r.value||0)-tatPago(r));return `<div class="item" style="padding:9px 0"><div class="tx"><div style="font-weight:500">${esc(r.desc)}</div><span class="muted">vence ${dBR(r.date)}${r.origem==="estoque"?" · estoque":r.origem==="financas"?" · veio do Financas"+(r.aClassificar?" (classificar no Frana)":""):""}${tatPago(r)>0&&f>0.004?` · pagou ${brl(tatPago(r))}, falta ${brl(f)}`:""}</span></div><span class="val">${brl(r.value)}</span>${f<=0.004?`<span class="pill ok">Pago</span>`:tatPago(r)>0?`<span class="pill warn">Parcial</span>`:`<span class="pill bad">Pendente</span>`}</div>`}).join("")}</div>`}).join(""):`<div class="card empty">A tattoo não te deve nada 🎉</div>`}
     <h2>Tattoos</h2><div class="card">${[...FR.tattoos].sort((a,b)=>(b.date||"").localeCompare(a.date||"")).map(t=>`<div class="item"><div class="dot" style="background:var(--violet-bg)">🖋️</div><div class="tx"><div>${esc(t.client||"Cliente")}</div><span class="muted">${dBR(t.date)} · ${esc(t.type||"")}${t.localCorpo?" · "+esc(t.localCorpo):""}</span></div><span style="text-align:right"><span class="val">${brl(t.value)}</span><br><small class="muted">lucro ${brl((+t.value||0)-(+t.costTotal||0))}</small></span></div>`).join("")||`<div class="empty">Nenhuma tattoo ainda.</div>`}</div>
     <h2>Eventos</h2><div class="card">${[...FR.events].sort((a,b)=>(a.date||"").localeCompare(b.date||"")).map(e=>`<div class="item"><div class="dot" style="background:var(--sun-bg)">🎪</div><div class="tx"><div>${esc(e.name||"Evento")}</div><span class="muted">${dBR(e.date)}${e.location?" · "+esc(e.location):""}</span></div><span class="val">−${brl(sum(e.expenses||[],x=>x.value))}</span></div>`).join("")||`<div class="empty">Nenhum evento.</div>`}</div>
     <p class="muted">Esses dados vêm do Frana Tattoo Control. Pra mudar alguma coisa, edita lá que aparece aqui.</p>`;
@@ -816,8 +823,9 @@ function sheetGasto(msg=""){
     ${form.inbox&&(()=>{const x=INBOX.find(i=>i.id===form.inbox);const fx=x&&pareceFixo(x);return fx?`<div class="fxwarn"><b>Parece o fixo "${esc(fx[0])}"</b><span>${fx[2]==="cartao"?"Ele já entra sozinho na fatura todo mês.":"Ele já aparece em Pra pagar todo mês."} Se for ele, não lança de novo:</span><button class="btn sm" data-act="inboxFixo" data-id="${x.id}" data-k="${esc(fx[0])}">É o fixo, não lançar</button></div>`:""})()}
     <label class="f">Valor<input class="bigval" id="gValor" type="text" inputmode="decimal" placeholder="0,00" value="${esc(form.valor)}"></label>
     <label class="f">Descrição<input id="gDesc" placeholder="Ex.: mercado da semana" value="${esc(form.desc)}"></label>
-    <div><span class="muted" style="font-weight:600">Categoria</span><div class="chips">${S.cats.map(c=>`<button class="chip" style="--c:${c.c}" aria-pressed="${form.cat===c.n}" data-act="fcat" data-v="${esc(c.n)}">${c.e} ${esc(c.n)}</button>`).join("")}</div></div>
+    <div><span class="muted" style="font-weight:600">Categoria</span><div class="chips"><button class="chip tatchip" style="--c:#C04FD6" aria-pressed="${form.cat===TATCAT.n}" data-act="fcat" data-v="${TATCAT.n}">🖋️ Frana Tattoo</button>${S.cats.map(c=>`<button class="chip" style="--c:${c.c}" aria-pressed="${form.cat===c.n}" data-act="fcat" data-v="${esc(c.n)}">${c.e} ${esc(c.n)}</button>`).join("")}</div></div>
     <div><span class="muted" style="font-weight:600">Pago com</span>${form.inbox?`<div class="muted" style="font-size:12px">Débito → Sicredi · Crédito → Cartão Sicredi</div>`:""}<div class="chips">${formas.map(([id,n,c])=>`<button class="chip" style="--c:${c}" aria-pressed="${form.forma===id}" data-act="fforma" data-v="${id}">${esc(n)}</button>`).join("")}</div></div>
+    ${form.cat===TATCAT.n?`<div class="fxwarn" style="background:#C04FD61f"><b>Compra da tattoo</b><span>Sai da tua conta normal, mas vai pro Frana como reembolso pendente (a tattoo te deve). Lá tu classifica se foi estoque, evento ou avulso.</span></div>`:""}
     ${form.forma==="cartao"?`<div class="parcbox"><span class="muted" style="font-weight:600">Parcelas</span>
       <div class="stepper"><button data-act="parc" data-d="-1" aria-label="Menos parcelas">−</button><b>${form.parcelas||1}x</b><button data-act="parc" data-d="1" aria-label="Mais parcelas">+</button>
       <span class="muted" id="parcInfo">${parcInfo()}</span></div></div>`:""}
@@ -877,6 +885,27 @@ function sincTatEntradas(){
     if(d>0)setTimeout(()=>toast(`Tattoo pagou ${brl(d)} → ${conta(c)?.nome}`),300);
   }
   return mudou;
+}
+/* compra da tattoo -> reembolso pendente no Frana (uma linha por parcela, vencendo junto com a fatura) */
+async function criarReembFrana(g){
+  const n=Math.max(1,+g.parcelas||1), cent=Math.round((+g.valor||0)*100), base=Math.floor(cent/n), ini=g.forma==="cartao"?primeiraFatura(g.data):null;
+  const linhas=[];
+  for(let i=0;i<n;i++){
+    const date=g.forma==="cartao"?shiftM(ini,i)+"-"+String(S.cartao.vence).padStart(2,"0"):g.data;
+    linhas.push({id:"fin_"+g.id+(n>1?"_"+(i+1):""),data:{desc:(g.desc||"Compra da tattoo")+(n>1?` ${i+1}/${n}`:""),value:(i===n-1?cent-base*(n-1):base)/100,origem:"financas",aClassificar:true,
+      gastoId:g.id,forma:g.forma==="cartao"?"credito":"debito",compraData:g.data,date,pagoValor:0,createdAt:new Date().toISOString()}});
+  }
+  (S.tatVisto=S.tatVisto||{}); linhas.forEach(l=>S.tatVisto[l.id]=0);
+  if(PREVIA||!sb){linhas.forEach(l=>FR.reembolsos.push({id:l.id,...l.data}));try{localStorage.setItem("fin-previa-frana",JSON.stringify(FR))}catch(e){}render();return}
+  const {error}=await sb.from("frana_docs").insert(linhas.map(l=>({user_id:SB_USER.id,col:"reembolsos",id:l.id,data:l.data})));
+  if(error){console.error(error);toast("Não consegui mandar pro Frana");return}
+  toast("Mandei pro Frana como reembolso");
+}
+async function apagarReembFrana(g){
+  const ids=FR.reembolsos.filter(r=>r.gastoId===g.id&&!(tatPago(r)>0)).map(r=>r.id);
+  FR.reembolsos=FR.reembolsos.filter(r=>!ids.includes(r.id));
+  if(PREVIA||!sb){try{localStorage.setItem("fin-previa-frana",JSON.stringify(FR))}catch(e){}return}
+  if(ids.length){const {error}=await sb.from("frana_docs").delete().eq("col","reembolsos").in("id",ids);if(error)console.error(error)}
 }
 async function aplicarPagTattoo(v,contaId){
   const p=planoAbate(v);
@@ -1028,12 +1057,13 @@ document.addEventListener("click",e=>{
     const g={id:uid(),data:form.data||HOJE,desc:form.desc.trim(),valor:v,cat:form.cat,forma:form.forma};
     if(g.forma==="cartao"&&(form.parcelas||1)>1)g.parcelas=form.parcelas;
     S.gastos.push(g); if(g.forma!=="cartao")mexeSaldo(g.forma,-v);
+    if(ehTattoo(g))criarReembFrana(g);
     const veioInbox=form.inbox; form.inbox=null;
     curG=g.data.slice(0,7); catOpen=null; closeSheet(); commit(); save();
     if(veioInbox){tirarInbox(veioInbox).then(()=>{render();if(INBOX.length&&tab==="inicio")sheetInbox()})}
     toast(`Salvo: ${brl(v)} em ${g.cat}`)}
   else if(a==="delGasto"){const g=S.gastos.find(x=>x.id===b.dataset.id);if(!g||!confirma(b,"Apagar este gasto? O valor volta pro saldo da conta."))return;
-    if(g.forma!=="cartao")mexeSaldo(g.forma,+g.valor);S.gastos=S.gastos.filter(x=>x!==g);commit()}
+    if(g.forma!=="cartao")mexeSaldo(g.forma,+g.valor);if(ehTattoo(g))apagarReembFrana(g).then(render);S.gastos=S.gastos.filter(x=>x!==g);commit()}
   else if(a==="catopen"){catOpen=b.dataset.v||null;rGastos()}
   else if(a==="inbox"){sheetInbox()}
   else if(a==="classificar"){const x=INBOX.find(i=>i.id===b.dataset.id);if(!x)return;

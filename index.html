@@ -188,18 +188,18 @@ nav.bn button[aria-selected="true"]::after{content:"";position:absolute;top:0;le
 .projhero .tin div{background:rgba(255,255,255,.16);border-radius:12px;padding:9px 12px}
 .projhero .tin small{opacity:.8;font-size:12px}.projhero .tin b{display:block;font-family:var(--display);font-size:17px}
 .tatbig{position:relative;overflow:hidden;width:100%;border:0;text-align:left;cursor:pointer;font-family:var(--body);color:#fff;border-radius:24px;padding:20px;margin-bottom:12px;
-  background:radial-gradient(130% 120% at 100% 0%,#5A2D6E 0%,#2A1A3F 45%,#140D1F 100%);box-shadow:0 14px 34px rgba(38,27,58,.35),inset 0 0 0 1px rgba(255,255,255,.07)}
-.tatbig .orn{position:absolute;right:-24px;top:-18px;width:210px;height:210px;color:#F7A8C4;opacity:.28;pointer-events:none}
+  background:linear-gradient(135deg,#FF5C9E 0%,#C04FD6 48%,#3E7BFF 100%);box-shadow:0 14px 34px rgba(90,70,220,.35),inset 0 0 0 1px rgba(255,255,255,.18)}
+.tatbig .orn{position:absolute;right:-24px;top:-18px;width:210px;height:210px;color:#fff;opacity:.35;pointer-events:none}
 .tatbig .tl{display:flex;justify-content:space-between;align-items:center;position:relative}
-.tatbig .tag{font-weight:700;font-size:13px;letter-spacing:.04em;text-transform:uppercase;background:linear-gradient(90deg,#F7A8C4,#FFC9A0);-webkit-background-clip:text;background-clip:text;color:transparent}
+.tatbig .tag{font-weight:800;font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:#fff}
 .tatbig .chev2{font-size:22px;opacity:.7}
-.tatbig .lbl{display:block;margin-top:14px;font-size:12px;opacity:.65;position:relative}
+.tatbig .lbl{display:block;margin-top:14px;font-size:12px;opacity:.85;position:relative}
 .tatbig .tv{font-family:var(--display);font-size:clamp(36px,11vw,48px);font-weight:800;line-height:1.05;font-variant-numeric:tabular-nums;position:relative}
 .tstats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:16px;position:relative}
-.tstats div{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:10px}
-.tstats small{display:block;font-size:11px;opacity:.65}
+.tstats div{background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.22);border-radius:14px;padding:10px;backdrop-filter:blur(4px)}
+.tstats small{display:block;font-size:11px;opacity:.85}
 .tstats b{display:block;font-family:var(--display);font-size:16px;margin-top:2px;font-variant-numeric:tabular-nums}
-.tstats .deve{background:linear-gradient(135deg,rgba(247,168,196,.22),rgba(255,201,160,.14));border-color:rgba(247,168,196,.3)}
+.tstats .deve{background:rgba(255,255,255,.95);border-color:#fff;color:#3E2A8C}
 .mbar{display:flex;height:10px;border-radius:6px;overflow:hidden;background:var(--well);margin-top:14px}
 .mbar div{height:100%}
 .mleg{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:12px;color:var(--soft);margin-top:6px}
@@ -296,7 +296,7 @@ footer{margin-top:30px;font-size:12px;color:var(--soft);text-align:center}
 <div class="tab" id="t-metas"></div>
 <div class="tab" id="t-negocios"></div>
 
-<footer>Pra planejar e acompanhar. Não é consultoria financeira.<br><span style="opacity:.6">versão 25/09 · projetos</span></footer>
+<footer>Pra planejar e acompanhar. Não é consultoria financeira.<br><span style="opacity:.6">versão 25/09 · 2</span></footer>
 </main>
 
 <nav class="bn"><div class="in" role="tablist">
@@ -751,7 +751,7 @@ function rNegocios(){
         <path d="M40 160c20-10 30-30 30-50M30 150l6-3M44 176l4-5"/><path d="M175 170l3-9 3 9-9-3 9-3"/><path d="M60 30l2-6 2 6-6-2 6-2"/></g></svg>
       <div class="tl"><span class="tag">🖋️ Tattoo</span><span class="chev2">›</span></div>
       <small class="lbl">Saldo do negócio</small>
-      <div class="tv" style="color:${ts.saldo<0?"#FF9DB0":"#fff"}">${brl(ts.saldo)}</div>
+      <div class="tv">${brl(ts.saldo)}</div>
       <div class="tstats">
         <div><small>Faturou no mês</small><b>${brl(sum(FR.tattoos.filter(t=>t.pago!==false&&(t.date||"").slice(0,7)===MES_HOJE),t=>t.value))}</b></div>
         <div><small>Tattoos no mês</small><b>${FR.tattoos.filter(t=>(t.date||"").slice(0,7)===MES_HOJE).length}</b></div>
@@ -1121,10 +1121,14 @@ function maskMoney(el){
 document.addEventListener("input",e=>{if(isMoney(e.target))maskMoney(e.target)});
 /* ao tocar no campo ele limpa; se sair sem digitar nada, volta o valor que tinha */
 document.addEventListener("focusin",e=>{const el=e.target;if(!isMoney(el))return;el.dataset.prev=el.value;el.value=""});
-document.addEventListener("focusout",e=>{const el=e.target;if(!isMoney(el))return;if(el.value===""&&el.dataset.prev&&num(el.dataset.prev)!==0)el.value=el.dataset.prev;delete el.dataset.prev});
+/* o Safari do iPhone não dispara "change" quando o valor foi formatado pela máscara, então salva ao sair do campo */
+document.addEventListener("focusout",e=>{const el=e.target;if(!isMoney(el))return;const prev=el.dataset.prev;
+  if(el.value===""&&prev&&num(prev)!==0)el.value=prev; delete el.dataset.prev;
+  if(el.value!==""&&num(el.value)!==num(prev))aplicaCampo(el)});
 function saveForm(){if(!$("gValor"))return;form.valor=$("gValor").value;form.desc=$("gDesc").value;form.data=$("gData").value||HOJE}
-document.addEventListener("change",e=>{
-  const t=e.target,d=t.dataset;
+document.addEventListener("change",e=>aplicaCampo(e.target));
+function aplicaCampo(t){
+  const d=t.dataset;
   if(d.saldo!==undefined){S.contas[+d.saldo].saldo=num(t.value)}
   else if(d.fat){S.fatura[d.fat]=num(t.value)}
   else if(d.card){if(d.card==="limite")S.cartao.limite=num(t.value);else{const n=Math.round(num(t.value));if(n>=1&&n<=31)S.cartao[d.card]=n}}
@@ -1135,7 +1139,7 @@ document.addEventListener("change",e=>{
   else return;
   /* espera o foco ir pro próximo campo antes de redesenhar */
   setTimeout(()=>{commit(); if(t.closest("#sheet")&&(d.fx!==undefined||d.ap!==undefined||d.ct!==undefined||d.card))sheetAjustes();},0);
-});
+}
 function go(t){tab=t;document.querySelectorAll(".tab").forEach(x=>x.classList.toggle("on",x.id==="t-"+t));
   document.querySelectorAll("nav.bn button").forEach(x=>x.setAttribute("aria-selected",x.dataset.tab===t));scrollTo(0,0)}
 

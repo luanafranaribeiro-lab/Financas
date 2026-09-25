@@ -187,6 +187,23 @@ nav.bn button[aria-selected="true"]::after{content:"";position:absolute;top:0;le
 .projhero .tin{display:grid;gap:8px;margin-top:12px}
 .projhero .tin div{background:rgba(255,255,255,.16);border-radius:12px;padding:9px 12px}
 .projhero .tin small{opacity:.8;font-size:12px}.projhero .tin b{display:block;font-family:var(--display);font-size:17px}
+.tatbig{position:relative;overflow:hidden;width:100%;border:0;text-align:left;cursor:pointer;font-family:var(--body);color:#fff;border-radius:24px;padding:20px;margin-bottom:12px;
+  background:radial-gradient(130% 120% at 100% 0%,#5A2D6E 0%,#2A1A3F 45%,#140D1F 100%);box-shadow:0 14px 34px rgba(38,27,58,.35),inset 0 0 0 1px rgba(255,255,255,.07)}
+.tatbig .orn{position:absolute;right:-24px;top:-18px;width:210px;height:210px;color:#F7A8C4;opacity:.28;pointer-events:none}
+.tatbig .tl{display:flex;justify-content:space-between;align-items:center;position:relative}
+.tatbig .tag{font-weight:700;font-size:13px;letter-spacing:.04em;text-transform:uppercase;background:linear-gradient(90deg,#F7A8C4,#FFC9A0);-webkit-background-clip:text;background-clip:text;color:transparent}
+.tatbig .chev2{font-size:22px;opacity:.7}
+.tatbig .lbl{display:block;margin-top:14px;font-size:12px;opacity:.65;position:relative}
+.tatbig .tv{font-family:var(--display);font-size:clamp(36px,11vw,48px);font-weight:800;line-height:1.05;font-variant-numeric:tabular-nums;position:relative}
+.tstats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:16px;position:relative}
+.tstats div{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:10px}
+.tstats small{display:block;font-size:11px;opacity:.65}
+.tstats b{display:block;font-family:var(--display);font-size:16px;margin-top:2px;font-variant-numeric:tabular-nums}
+.tstats .deve{background:linear-gradient(135deg,rgba(247,168,196,.22),rgba(255,201,160,.14));border-color:rgba(247,168,196,.3)}
+.mbar{display:flex;height:10px;border-radius:6px;overflow:hidden;background:var(--well);margin-top:14px}
+.mbar div{height:100%}
+.mleg{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:12px;color:var(--soft);margin-top:6px}
+.mleg i{display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:5px}
 /* rings */
 .rings{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
 .ring{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:14px;text-align:center}
@@ -500,8 +517,10 @@ function porCategoria(k){
 function metaInfo(m){
   const alvo=+m.alvo||0, tenho=+m.tenho||0, emp=+m.emprestado||0, n=+m.parcelas||0, vp=+m.valorParcela||0, pg=Math.min(+m.pagas||0,n);
   const totalFin=n*vp, juros=totalFin>0&&emp>0?totalFin-emp:0, restante=(n-pg)*vp;
-  const pct=alvo>0?Math.min(1,tenho/alvo):(n>0?pg/n:0);
-  return {alvo,tenho,emp,n,vp,pg,totalFin,juros,restante,pct,falta:Math.max(0,alvo-tenho)};
+  const disp=tenho+emp;                         /* o que eu tenho pra usar, com empréstimo */
+  const pct=alvo>0?Math.min(1,disp/alvo):(n>0?pg/n:0);
+  const pOwn=alvo>0?Math.min(1,tenho/alvo):0, pEmp=alvo>0?Math.max(0,Math.min(1,disp/alvo)-pOwn):0;
+  return {alvo,tenho,emp,disp,n,vp,pg,totalFin,juros,restante,pct,pOwn,pEmp,falta:Math.max(0,alvo-disp)};
 }
 
 /* ================= VISUAIS ================= */
@@ -511,6 +530,15 @@ function donut(parts,size=150,th=22,center=""){
   if(total<=0) segs=`<circle cx="${size/2}" cy="${size/2}" r="${r}" fill="none" stroke="var(--well)" stroke-width="${th}"/>`;
   else parts.forEach(([c,v])=>{const L=v/total*C;segs+=`<circle cx="${size/2}" cy="${size/2}" r="${r}" fill="none" stroke="${c}" stroke-width="${th}" stroke-dasharray="${L} ${C-L}" stroke-dashoffset="${-off}" transform="rotate(-90 ${size/2} ${size/2})"/>`;off+=L;});
   return `<svg viewBox="0 0 ${size} ${size}" aria-hidden="true">${segs}${center}</svg>`;
+}
+/* anel com duas partes: dinheiro meu (cor cheia) + emprestado (mesma cor, clarinha) */
+function ring2(x,color,size=92,th=10){
+  if(!x.alvo)return ring(x.pct,color,size,th,x.n?Math.round(x.pct*100)+"%":"—");
+  const r=(size-th)/2,C=2*Math.PI*r,a=x.pOwn*C,b=x.pEmp*C,c=size/2;
+  return `<svg viewBox="0 0 ${size} ${size}" aria-hidden="true"><circle cx="${c}" cy="${c}" r="${r}" fill="none" stroke="var(--well)" stroke-width="${th}"/>
+  ${b>0.5?`<circle cx="${c}" cy="${c}" r="${r}" fill="none" stroke="${color}" stroke-opacity=".35" stroke-width="${th}" stroke-dasharray="${b} ${C}" stroke-dashoffset="${-a}" transform="rotate(-90 ${c} ${c})"/>`:""}
+  ${a>0.5?`<circle cx="${c}" cy="${c}" r="${r}" fill="none" stroke="${color}" stroke-width="${th}" stroke-linecap="round" stroke-dasharray="${a} ${C}" transform="rotate(-90 ${c} ${c})"/>`:""}
+  <text x="50%" y="50%" text-anchor="middle" dominant-baseline="central" font-family="Bricolage Grotesque, sans-serif" font-weight="800" font-size="${size/4.6}" fill="var(--ink)">${Math.round(x.pct*100)}%</text></svg>`;
 }
 function ring(pct,color,size=92,th=10,label=""){
   const r=(size-th)/2,C=2*Math.PI*r,L=Math.max(0,Math.min(1,pct))*C;
@@ -538,7 +566,7 @@ function rInicio(){
     <span class="pc">${pend.length?pend.length+(pend.length===1?" conta":" contas"):"Tudo pago 🎉"} ›</span>
   </button>
   <h2>Metas</h2>
-  <div class="rings">${S.metas.map(m=>{const i=metaInfo(m);return `<div class="ring">${ring(i.pct,m.c||"#7B5CF0",92,10,(i.alvo||i.n)?Math.round(i.pct*100)+"%":"—")}<b>${esc(m.e||"🎯")} ${esc(m.nome)}</b><div class="muted">${i.alvo?brl0(i.tenho)+" de "+brl0(i.alvo):i.n?i.pg+" de "+i.n+" parcelas":brl0(i.tenho)+" guardado"}</div></div>`}).join("")}</div>`;
+  <div class="rings">${S.metas.map(m=>{const i=metaInfo(m);return `<div class="ring">${ring2(i,m.c||"#7B5CF0",92,10)}<b>${esc(m.e||"🎯")} ${esc(m.nome)}</b><div class="muted">${i.alvo?brl0(i.disp)+" de "+brl0(i.alvo):i.n?i.pg+" de "+i.n+" parcelas":brl0(i.tenho)+" guardado"}</div></div>`}).join("")}</div>`;
 }
 function sheetListaPagar(){
   const pend=pendentes(curHome), pendT=sum(pend,p=>p.valor);
@@ -633,17 +661,19 @@ function rFaturas(){
 }
 
 function rMetas(){
-  $("t-metas").innerHTML=`<p class="muted" style="margin:8px 0 14px">Crie uma meta e preencha o que fizer sentido: quanto quer, quanto já tem, e se pegou dinheiro emprestado, as parcelas.</p>
+  $("t-metas").innerHTML=`<p class="muted" style="margin:8px 0 14px">O % é quanto tu já tem (teu + emprestado) em relação ao custo. A parte clarinha do anel é o emprestado.</p>
   ${S.metas.map((m,i)=>{const x=metaInfo(m);return `<div class="card meta" style="margin-bottom:12px">
-    <div class="top2">${ring(x.pct,m.c||"#7B5CF0",84,9,(x.alvo||x.n)?Math.round(x.pct*100)+"%":"—")}
+    <div class="top2">${ring2(x,m.c||"#7B5CF0",84,9)}
       <div style="flex:1;min-width:0"><div style="display:flex;gap:6px;align-items:center"><input data-mt="${i}" data-f="e" value="${esc(m.e||"🎯")}" aria-label="Ícone" style="width:42px;font-size:22px;border:0;background:transparent;padding:0"><input class="nm" data-mt="${i}" data-f="nome" value="${esc(m.nome)}" aria-label="Nome da meta"></div>
-      <div class="muted">${x.alvo?`Faltam ${brl(x.falta)}`:"Defina quanto você quer juntar"}</div></div>
+      <div class="muted">${x.alvo?(x.falta>0?`Faltam ${brl(x.falta)} pra ${brl0(x.alvo)}`:"Já tem o suficiente 🎉"):"Coloca quanto custa em Editar valores"}</div></div>
       <button class="x" data-act="delMeta" data-i="${i}" aria-label="Apagar meta">×</button></div>
+    ${x.alvo?`<div class="mbar"><div style="width:${x.pOwn*100}%;background:${m.c||"#7B5CF0"}"></div><div style="width:${x.pEmp*100}%;background:${m.c||"#7B5CF0"};opacity:.35"></div></div>
+    <div class="mleg"><span><i style="background:${m.c||"#7B5CF0"}"></i>Meu ${brl0(x.tenho)}</span><span><i style="background:${m.c||"#7B5CF0"};opacity:.35"></i>Emprestado ${brl0(x.emp)}</span><span>Custo ${brl0(x.alvo)}</span></div>`:""}
     <div class="facts"><div>Tenho<b>${brl0(x.tenho)}</b></div><div>Peguei emprestado<b>${brl0(x.emp)}</b></div><div>Parcela<b>${x.n?x.n+"x "+brl0(x.vp):"—"}</b></div>
       <div>Total a pagar<b>${brl0(x.totalFin)}</b></div><div>Juros<b style="color:${x.juros>0?"var(--bad)":"var(--ink)"}">${brl0(x.juros)}</b></div><div>Falta pagar<b>${brl0(x.restante)}</b></div></div>
     ${x.n?`<div class="muted">${x.pg} de ${x.n} parcelas pagas</div><div class="pbar"><div style="width:${x.pg/x.n*100}%;background:${m.c||"#7B5CF0"}"></div></div>`:""}
     <details><summary>Editar valores</summary><div class="grid2" style="margin-top:10px">
-      <label class="f">Quero juntar<input type="text" inputmode="decimal" data-mt="${i}" data-f="alvo" value="${inV0(m.alvo)}"></label>
+      <label class="f">Quanto custa<input type="text" inputmode="decimal" data-mt="${i}" data-f="alvo" value="${inV0(m.alvo)}"></label>
       <label class="f">Já tenho<input type="text" inputmode="decimal" data-mt="${i}" data-f="tenho" value="${inV0(m.tenho)}"></label>
       <label class="f">Peguei emprestado<input type="text" inputmode="decimal" data-mt="${i}" data-f="emprestado" value="${inV0(m.emprestado)}"></label>
       <label class="f">Nº de parcelas<input type="text" inputmode="numeric" data-mt="${i}" data-f="parcelas" value="${+m.parcelas||""}"></label>
@@ -713,10 +743,20 @@ function rNegocios(){
       <p class="muted" style="margin:8px 0 0;font-size:12px">Quando um projeto é pago pro teu pai, abate daqui começando pelo mês mais antigo.</p></div>`;
   } else {
     el.innerHTML=`<p class="muted" style="margin:8px 0 12px">Toque num empreendimento pra ver os detalhes.</p>
-    <button class="bizbig tat" data-act="abrirNeg" data-v="tattoo">
-      <div class="tl"><span>🖋️ Tattoo</span><span>›</span></div>
-      <div class="tv" style="color:${ts.saldo<0?"#FF9DB0":"#fff"}">${brl(ts.saldo)}</div><small class="lbl">saldo (lucro do Frana)</small>
-      <div class="tin"><div><small>Te deve em ${mshort(curHome)}</small><b>${brl(tatDeve(curHome))}</b></div><div><small>Te deve no total</small><b>${brl(tatDeveTotal())}</b></div></div>
+    <button class="tatbig" data-act="abrirNeg" data-v="tattoo">
+      <svg class="orn" viewBox="0 0 200 200" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round">
+        <circle cx="120" cy="80" r="52"/><circle cx="120" cy="80" r="40" stroke-dasharray="2 5"/>
+        <path d="M120 28v-14M120 146v14M68 80H54M172 80h14M83 43l-10-10M157 117l10 10M157 43l10-10M83 117l-10 10"/>
+        <path d="M98 70c10-22 34-22 44 0-10 26-34 26-44 0z"/><circle cx="120" cy="72" r="5"/>
+        <path d="M40 160c20-10 30-30 30-50M30 150l6-3M44 176l4-5"/><path d="M175 170l3-9 3 9-9-3 9-3"/><path d="M60 30l2-6 2 6-6-2 6-2"/></g></svg>
+      <div class="tl"><span class="tag">🖋️ Tattoo</span><span class="chev2">›</span></div>
+      <small class="lbl">Saldo do negócio</small>
+      <div class="tv" style="color:${ts.saldo<0?"#FF9DB0":"#fff"}">${brl(ts.saldo)}</div>
+      <div class="tstats">
+        <div><small>Faturou no mês</small><b>${brl(sum(FR.tattoos.filter(t=>t.pago!==false&&(t.date||"").slice(0,7)===MES_HOJE),t=>t.value))}</b></div>
+        <div><small>Tattoos no mês</small><b>${FR.tattoos.filter(t=>(t.date||"").slice(0,7)===MES_HOJE).length}</b></div>
+        <div class="deve"><small>Te deve</small><b>${brl(tatDeveTotal())}</b></div>
+      </div>
     </button>
     <button class="bizbig tar" data-act="abrirNeg" data-v="tarot">
       <div class="tl"><span>🔮 Tarot</span><span>›</span></div>

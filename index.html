@@ -279,7 +279,7 @@ footer{margin-top:30px;font-size:12px;color:var(--soft);text-align:center}
 <div class="tab" id="t-metas"></div>
 <div class="tab" id="t-negocios"></div>
 
-<footer>Pra planejar e acompanhar. Não é consultoria financeira.</footer>
+<footer>Pra planejar e acompanhar. Não é consultoria financeira.<br><span style="opacity:.6">versão 25/09 · projetos</span></footer>
 </main>
 
 <nav class="bn"><div class="in" role="tablist">
@@ -307,7 +307,11 @@ const PREVIA = false;
     <div style="font-size:22px;font-weight:800;margin-bottom:4px">Entrar</div>
     <div style="font-size:14px;color:#766C8E;margin-bottom:18px">Use o mesmo e-mail e senha nos dois apps.</div>
     <label style="display:block;font-size:13px;color:#766C8E;margin-bottom:12px">E-mail<input id="sbEmail" type="email" autocomplete="email" required style="display:block;width:100%;margin-top:4px;padding:11px 12px;border:1px solid #E3DDEF;border-radius:10px;font-size:16px;box-sizing:border-box"></label>
-    <label style="display:block;font-size:13px;color:#766C8E;margin-bottom:16px">Senha<input id="sbSenha" type="password" autocomplete="current-password" required style="display:block;width:100%;margin-top:4px;padding:11px 12px;border:1px solid #E3DDEF;border-radius:10px;font-size:16px;box-sizing:border-box"></label>
+    <label style="display:block;font-size:13px;color:#766C8E;margin-bottom:14px">Senha
+      <span style="position:relative;display:block;margin-top:4px"><input id="sbSenha" type="password" autocomplete="current-password" required style="display:block;width:100%;padding:11px 46px 11px 12px;border:1px solid #E3DDEF;border-radius:10px;font-size:16px;box-sizing:border-box">
+      <button type="button" id="sbOlho" aria-label="Mostrar senha" style="position:absolute;right:4px;top:50%;transform:translateY(-50%);width:38px;height:38px;border:0;background:transparent;color:#766C8E;cursor:pointer;display:grid;place-items:center">
+        <svg id="sbOlhoIc" viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button></span></label>
+    <label style="display:flex;align-items:center;gap:10px;font-size:14px;color:#261B3A;margin-bottom:16px;cursor:pointer"><input id="sbLembrar" type="checkbox" checked style="width:20px;height:20px;accent-color:#7B5CF0;margin:0"> Lembrar de mim neste aparelho</label>
     <button type="submit" style="width:100%;padding:12px;border:0;border-radius:10px;background:#7B5CF0;color:#fff;font-size:16px;font-weight:600;cursor:pointer">Entrar</button>
     <div id="sbLoginErr" style="color:#E0445E;font-size:14px;margin-top:12px;min-height:20px"></div>
   </form>
@@ -326,6 +330,17 @@ async function sbSignOut(){ await sb.auth.signOut(); location.reload(); }
   const box = document.getElementById('sbLogin');
   const form = document.getElementById('sbLoginForm');
   const err = document.getElementById('sbLoginErr');
+  const em = document.getElementById('sbEmail'), pw = document.getElementById('sbSenha'), lemb = document.getElementById('sbLembrar');
+  try{ const salvo = localStorage.getItem('fin-email'); if(salvo){ em.value = salvo; lemb.checked = true; } else if(localStorage.getItem('fin-lembrar')==='0'){ lemb.checked = false; } }catch(e){}
+  document.getElementById('sbOlho').addEventListener('click', ()=>{
+    const ver = pw.type === 'password'; pw.type = ver ? 'text' : 'password';
+    document.getElementById('sbOlho').setAttribute('aria-label', ver ? 'Esconder senha' : 'Mostrar senha');
+    document.getElementById('sbOlhoIc').innerHTML = ver
+      ? '<path d="M3 3l18 18"/><path d="M10.6 5.1A10.8 10.8 0 0 1 12 5c6.4 0 10 7 10 7a17.6 17.6 0 0 1-3.2 4.1M6.6 6.6C3.7 8.4 2 12 2 12s3.6 7 10 7a9.7 9.7 0 0 0 5.4-1.6"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/>'
+      : '<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>';
+  });
+  /* sem "lembrar": a sessão acaba quando fechar o app */
+  try{ if(localStorage.getItem('fin-lembrar')==='0' && !sessionStorage.getItem('fin-aberto')){ sb.auth.signOut({scope:'local'}); } sessionStorage.setItem('fin-aberto','1'); }catch(e){}
   function ready(user){
     if(SB_USER) return;
     SB_USER = user; box.style.display = 'none';
@@ -335,6 +350,7 @@ async function sbSignOut(){ await sb.auth.signOut(); location.reload(); }
     e.preventDefault(); err.textContent = 'Entrando…';
     const { data, error } = await sb.auth.signInWithPassword({ email: document.getElementById('sbEmail').value.trim(), password: document.getElementById('sbSenha').value });
     if(error){ err.textContent = error.message.includes('Invalid') ? 'E-mail ou senha incorretos.' : 'Não deu pra entrar: ' + error.message; return; }
+    try{ if(lemb.checked){ localStorage.setItem('fin-email', em.value.trim()); localStorage.setItem('fin-lembrar','1'); } else { localStorage.removeItem('fin-email'); localStorage.setItem('fin-lembrar','0'); } }catch(e){}
     err.textContent = ''; ready(data.user);
   });
   sb.auth.getSession().then(({ data })=>{
@@ -526,10 +542,18 @@ function rInicio(){
 }
 function sheetListaPagar(){
   const pend=pendentes(curHome), pendT=sum(pend,p=>p.valor);
-  openSheet(`<div style="display:flex;justify-content:space-between;align-items:center"><h3>Pra pagar em ${mfull(curHome)}</h3><button class="x" data-act="fechar" aria-label="Fechar">×</button></div>
+  const pagas=pagosDoMes(curHome);
+  openSheet(`<div style="display:flex;justify-content:space-between;align-items:center"><h3>Pra pagar</h3><button class="x" data-act="fechar" aria-label="Fechar">×</button></div>
+  <div class="monthnav" style="margin:10px 0 4px"><button data-act="listaMes" data-d="-1" aria-label="Mês anterior">‹</button><b>${mfull(curHome)}</b><button data-act="listaMes" data-d="1" aria-label="Próximo mês">›</button></div>
   <div style="font-family:var(--display);font-size:30px;font-weight:800;margin:6px 0 8px" class="num">${brl(pendT)}</div>
-  ${pend.length?pend.map(p=>`<div class="item"><div class="dot" style="background:var(--well)">${p.e}</div><div class="tx"><div>${esc(p.desc)}</div><span class="muted">${p.tipo==="fixo"?"Fixo do mês":p.tipo==="fatura"?"Cartão":"Conta a pagar"}</span></div><span class="val">${brl(p.valor)}</span><button class="btn sm" data-act="pagar" data-t="${p.tipo}" data-k="${esc(p.key)}" data-v="${p.valor}">Pagar</button></div>`).join(""):`<div class="empty">Tudo pago neste mês 🎉</div>`}`);
+  ${pend.length?pend.map(p=>`<div class="item"><div class="dot" style="background:var(--well)">${p.e}</div><div class="tx"><div>${esc(p.desc)}</div><span class="muted">${p.tipo==="fixo"?"Fixo do mês":p.tipo==="fatura"?"Cartão":"Conta a pagar"}</span></div><span class="val">${brl(p.valor)}</span><button class="btn sm" data-act="pagar" data-t="${p.tipo}" data-k="${esc(p.key)}" data-v="${p.valor}">Pagar</button></div>`).join(""):`<div class="empty">Tudo pago neste mês 🎉</div>`}
+  ${pagas.length?`<details style="margin-top:6px"><summary>Já pagas (${pagas.length} · ${brl(sum(pagas,p=>p.valor))})</summary><div style="margin-top:4px">${pagas.map(p=>`<div class="item" style="padding:9px 0;opacity:.75"><div class="dot" style="background:var(--mint-bg)">✓</div><div class="tx"><div style="font-weight:500">${esc(p.desc)}</div><span class="muted">${esc(p.como)}</span></div><span class="val">${brl(p.valor)}</span></div>`).join("")}</div></details>`:""}`);
 }
+function pagosDoMes(k){const out=[];
+  S.fixos.filter(f=>f[2]!=="cartao").forEach(f=>{const p=S.fixosPagos[k+"|"+f[0]];if(p)out.push({desc:f[0],valor:+p.valor||+f[1]||0,como:"Fixo · "+(conta(p.conta)?.nome||"")})});
+  S.aPagar.filter(a=>a.mes===k&&(a.pago||+a.pagoValor>0)).forEach(a=>out.push({desc:a.desc,valor:+a.pagoValor||+a.valor||0,como:a.pago&&a.pago.conta?"Pago do "+(conta(a.pago.conta)?.nome||""):"Abatido por projeto"}));
+  const fp=S.faturaPaga[k]; if(fp)out.push({desc:"Fatura Sicredi",valor:+fp.valor||0,como:"Cartão · "+(conta(fp.conta)?.nome||"")});
+  return out}
 
 function rGastos(){
   const lista=gastosMes(curG).sort((a,b)=>(b.data||"").localeCompare(a.data||"")), pc=porCategoria(curG), tot=sum(pc,x=>x[1]);
@@ -1025,6 +1049,7 @@ document.addEventListener("click",e=>{
   else if(a==="pagar"){voltarLista=!!b.closest("#sheet");sheetPagar(b.dataset.t,b.dataset.k,+b.dataset.v)}
   else if(a==="pagarCom"){pagar(payCtx.t,payCtx.k,payCtx.v,b.dataset.c);closeSheet();commit();toast(`Pago: ${brl(payCtx.v)}`);if(voltarLista)sheetListaPagar()}
   else if(a==="listaPagar"){voltarLista=true;sheetListaPagar()}
+  else if(a==="listaMes"){curHome=shiftM(curHome,+b.dataset.d);render();sheetListaPagar()}
   else if(a==="desfazerFat"){const p=S.faturaPaga[b.dataset.k];if(!p||!confirma(b,"Desfazer o pagamento? O valor volta pra conta."))return;mexeSaldo(p.conta,+p.valor);delete S.faturaPaga[b.dataset.k];commit()}
   else if(a==="addMeta"){S.metas.push({id:uid(),nome:"Nova meta",e:"🎯",c:["#7B5CF0","#F0598F","#D9A011","#2F95B8","#2E9E5B"][S.metas.length%5],alvo:0,tenho:0,emprestado:0,parcelas:0,valorParcela:0,pagas:0});commit()}
   else if(a==="delMeta"){if(!confirma(b,"Apagar esta meta?"))return;S.metas.splice(+b.dataset.i,1);commit()}

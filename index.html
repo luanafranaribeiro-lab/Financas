@@ -180,6 +180,13 @@ nav.bn button[aria-selected="true"]::after{content:"";position:absolute;top:0;le
 .fmini i{background:var(--violet-bg)!important}
 .fmini button.at i{background:var(--violet)!important}
 .fmini button.pg i{background:var(--mint)!important}
+.proj{background:linear-gradient(140deg,#2F95B8,#5B6CF0)}
+.projhero{background:linear-gradient(140deg,#2F95B8,#5B6CF0);color:#fff;border-radius:22px;padding:18px}
+.projhero .tl{font-weight:700;font-size:15px}
+.projhero .tv{font-family:var(--display);font-size:clamp(32px,9vw,42px);font-weight:800;margin-top:6px;font-variant-numeric:tabular-nums;line-height:1.1}
+.projhero .tin{display:grid;gap:8px;margin-top:12px}
+.projhero .tin div{background:rgba(255,255,255,.16);border-radius:12px;padding:9px 12px}
+.projhero .tin small{opacity:.8;font-size:12px}.projhero .tin b{display:block;font-family:var(--display);font-size:17px}
 /* rings */
 .rings{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
 .ring{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:14px;text-align:center}
@@ -363,13 +370,14 @@ const DEFAULTS={
   faturaPaga:{},    // mes -> {conta,valor,data}
   fixosPagos:{},    // "mes|nome" -> {conta,valor}
   cartao:{fecha:28,vence:13,limite:8150}, // cartão Sicredi
+  projetos:[],  // {id,data,desc,cliente,valor,pago,recebidoPor,conta}
   tatConta:"sicredi", // onde entram os pagamentos da tattoo feitos pelo Frana
   tatVisto:null,      // quanto de cada reembolso já foi lançado como entrada
   aPagar:[
-    {id:"mec1",desc:"Mecânico (pai)",valor:250,mes:"2026-10"},
-    {id:"mec2",desc:"Mecânico (pai)",valor:280.87,mes:"2026-10"},
-    {id:"mec3",desc:"Mecânico (pai)",valor:280.87,mes:"2026-11"},
-    {id:"mec4",desc:"Mecânico (pai)",valor:280.87,mes:"2026-12"}
+    {id:"mec1",credor:"pai",desc:"Mecânico (pai)",valor:250,mes:"2026-10"},
+    {id:"mec2",credor:"pai",desc:"Mecânico (pai)",valor:280.87,mes:"2026-10"},
+    {id:"mec3",credor:"pai",desc:"Mecânico (pai)",valor:280.87,mes:"2026-11"},
+    {id:"mec4",credor:"pai",desc:"Mecânico (pai)",valor:280.87,mes:"2026-12"}
   ],
   metas:[
     {id:"carro",nome:"Carro novo",e:"🚗",c:"#5B6CF0",alvo:0,tenho:7500,emprestado:0,parcelas:0,valorParcela:0,pagas:0},
@@ -397,7 +405,7 @@ const FRANA_PREVIA={
 
 let S=structuredClone(DEFAULTS), FR={reembolsos:[],tattoos:[],events:[]};
 const hoje=new Date(), HOJE=hoje.toISOString().slice(0,10), MES_HOJE=HOJE.slice(0,7);
-let curHome = MES_HOJE<FAT_MESES[0]?FAT_MESES[0]:MES_HOJE, curG=MES_HOJE, tab="inicio";
+let curHome = MES_HOJE, curG=MES_HOJE, tab="inicio";
 let form={valor:"",desc:"",cat:"",forma:"sicredi",data:HOJE,inbox:null}, catOpen=null;
 /* gastos que chegaram pelo Atalho do iPhone (Carteira / Apple Pay) */
 let INBOX=[];
@@ -440,10 +448,18 @@ function faturaDe(k){
   const compras=+S.fatura[k]||0, rec=sum(recorrCartao(),f=>f[1]), lanc=sum(parc,p=>p.v);
   return {compras,rec,lanc,parc,total:Math.round((compras+rec+lanc)*100)/100,paga:S.faturaPaga[k]};
 }
+const apFalta=a=>Math.max(0,Math.round(((+a.valor||0)-(+a.pagoValor||0))*100)/100);
+const dividaPai=()=>S.aPagar.filter(a=>a.credor==="pai"&&!a.pago&&apFalta(a)>0.004).sort((x,y)=>(x.mes||"").localeCompare(y.mes||""));
+function abaterPai(v,origem){let rest=Math.round(v*100)/100;const out=[];
+  for(const a of dividaPai()){if(rest<=0.004)break;const f=apFalta(a),t=Math.min(rest,f);a.pagoValor=Math.round(((+a.pagoValor||0)+t)*100)/100;
+    (a.abatimentos=a.abatimentos||[]).push({valor:t,data:HOJE,origem});if(apFalta(a)<=0.004)a.pago={via:"abatimento",data:HOJE};out.push({a,t});rest=Math.round((rest-t)*100)/100}
+  return {out,rest}}
+function planoPai(v){let rest=v;const out=[];for(const a of dividaPai()){if(rest<=0.004)break;const t=Math.min(rest,apFalta(a));out.push({a,t});rest-=t}return {out,rest:Math.round(rest*100)/100}}
 function pendentes(k){
   const out=[];
+  if(k<FAT_MESES[0])return out; /* o controle de contas começa em outubro/26 */
   S.fixos.filter(f=>f[2]!=="cartao").forEach(f=>{ if(!S.fixosPagos[k+"|"+f[0]]) out.push({tipo:"fixo",key:k+"|"+f[0],desc:f[0],valor:+f[1]||0,e:"📌"}); });
-  S.aPagar.filter(a=>a.mes===k&&!a.pago).forEach(a=>out.push({tipo:"conta",key:a.id,desc:a.desc,valor:+a.valor||0,e:"🔧"}));
+  S.aPagar.filter(a=>a.mes===k&&!a.pago&&apFalta(a)>0.004).forEach(a=>out.push({tipo:"conta",key:a.id,desc:a.desc+(+a.pagoValor>0?` (falta ${brl(apFalta(a))})`:""),valor:apFalta(a),e:a.credor==="pai"?"👨":"🔧"}));
   if(FAT_MESES.includes(k)){const fz=faturaDe(k); if(!fz.paga&&fz.total>0) out.push({tipo:"fatura",key:k,desc:"Fatura Sicredi",valor:fz.total,e:"💳"});}
   return out;
 }
@@ -615,6 +631,7 @@ function rMetas(){
 }
 
 let negView=null;
+function projResumo(){const P=S.projetos||[];return {recebido:sum(P.filter(p=>p.pago),p=>p.valor),aReceber:sum(P.filter(p=>!p.pago),p=>p.valor),viaPai:sum(P.filter(p=>p.pago&&p.recebidoPor==="pai"),p=>p.valor),n:P.length}}
 const tPago=t=>t.pago!==false, tQtd=t=>Math.max(1,+t.qtd||1);
 function tarotResumo(k){const L=k?S.tarot.filter(t=>(t.data||"").slice(0,7)===k):S.tarot;
   return {recebido:sum(L.filter(tPago),t=>t.valor),aReceber:sum(L.filter(t=>!tPago(t)),t=>t.valor),tiragens:sum(L,tQtd),n:L.length}}
@@ -625,7 +642,7 @@ function barras(m,cor,n=6){
   return `<div class="bars">${ks.map(k=>`<div><span class="num">${m[k]?brl0(m[k]):""}</span><i style="height:${(m[k]||0)/mx*100}%;background:${cor}"></i><small>${mshort(k).split("/")[0]}</small></div>`).join("")}</div>`;
 }
 function rNegocios(){
-  const el=$("t-negocios"), ts=tatSaldo(), tr=tarotResumo(), trM=tarotResumo(MES_HOJE);
+  const el=$("t-negocios"), ts=tatSaldo(), tr=tarotResumo(), trM=tarotResumo(MES_HOJE), pr=projResumo();
   if(negView==="tattoo"){
     const grupos={}; FR.reembolsos.forEach(r=>{const k=(r.date||"").slice(0,7);(grupos[k]=grupos[k]||[]).push(r)});
     const meses=Object.keys(grupos).sort();
@@ -656,6 +673,20 @@ function rNegocios(){
     <h2>Recebido por mês</h2><div class="card">${barras(porMes(S.tarot.filter(tPago),t=>t.data,t=>t.valor),"#E4A91A")}</div>
     <h2>Tiragens</h2><div class="card">${[...S.tarot].sort((a,b)=>(b.data||"").localeCompare(a.data||"")).map(t=>`<div class="item"><div class="dot" style="background:var(--sun-bg);font-family:var(--display);font-weight:800;font-size:15px">${tQtd(t)}x</div><div class="tx"><div>${esc(t.desc||"Tiragem")}</div><span class="muted">${dBR(t.data)} · ${tQtd(t)} ${tQtd(t)===1?"tiragem":"tiragens"}</span></div><span style="text-align:right"><span class="val">${brl(t.valor)}</span><br><button class="pill ${tPago(t)?"ok":"bad"}" style="border:0;cursor:pointer;margin-top:3px" data-act="tarotPago" data-id="${t.id}">${tPago(t)?"Pago":"Não pago"}</button></span><button class="x" data-act="delTarot" data-id="${t.id}" aria-label="Apagar">×</button></div>`).join("")||`<div class="empty">Nenhuma tiragem registrada ainda.</div>`}
     ${S.tarot.length?`<p class="muted" style="margin:8px 0 0;font-size:12px">Toque em Pago / Não pago pra trocar.</p>`:""}</div>`;
+  } else if(negView==="projetos"){
+    const dv=dividaPai(), dvT=sum(dv,apFalta);
+    el.innerHTML=`<button class="back" data-act="abrirNeg" data-v="">‹ Empreendimentos</button>
+    <div class="projhero"><div class="tl">📐 Projetos · recebido</div><div class="tv">${brl(pr.recebido)}</div>
+      <div class="tin" style="grid-template-columns:repeat(3,1fr)"><div><small>A receber</small><b>${brl(pr.aReceber)}</b></div><div><small>Pago ao pai</small><b>${brl(pr.viaPai)}</b></div><div><small>Projetos</small><b>${pr.n}</b></div></div></div>
+    <button class="btn full" style="margin-top:10px;background:#2F95B8;font-size:16px;padding:14px" data-act="novoProj">+ Novo projeto</button>
+    <h2>Projetos</h2><div class="card">${[...S.projetos].sort((a,b)=>(b.data||"").localeCompare(a.data||"")).map(p=>`<div class="item"><div class="dot" style="background:#2F95B822">📐</div><div class="tx"><div>${esc(p.desc||"Projeto")}</div><span class="muted">${dBR(p.data)}${p.cliente?" · "+esc(p.cliente):""}${p.pago?(p.recebidoPor==="pai"?" · pago pro pai":" · entrou em "+esc(conta(p.conta)?.nome||"")):""}</span></div>
+      <span style="text-align:right"><span class="val">${brl(p.valor)}</span><br>${p.pago?`<span class="pill ok" style="margin-top:3px">Pago</span>`:`<button class="pill bad" style="border:0;cursor:pointer;margin-top:3px" data-act="recebiProj" data-id="${p.id}">Receber</button>`}</span>
+      <button class="x" data-act="delProj" data-id="${p.id}" aria-label="Apagar">×</button></div>`).join("")||`<div class="empty">Nenhum projeto ainda.</div>`}</div>
+    <h2 style="display:flex;justify-content:space-between;align-items:center">👨 Dívida com o pai <button class="btn sm ghost" data-act="novoEmpPai">+ Empréstimo</button></h2>
+    <div class="card"><div style="display:flex;justify-content:space-between;align-items:baseline"><span class="muted">Falta pagar</span><b style="font-family:var(--display);font-size:24px" class="num">${brl(dvT)}</b></div>
+      ${S.aPagar.filter(a=>a.credor==="pai").sort((x,y)=>(x.mes||"").localeCompare(y.mes||"")).map(a=>{const f=apFalta(a),v=+a.valor||0;return `<div class="item" style="padding:10px 0"><div class="tx"><div style="font-weight:500">${esc(a.desc)}</div><span class="muted">${mshort(a.mes)}${+a.pagoValor>0&&f>0.004?` · pago ${brl(a.pagoValor)}`:""}</span>
+        <div class="pbar" style="height:6px;margin-top:5px"><div style="width:${v?(v-f)/v*100:0}%;background:var(--mint)"></div></div></div><span class="val">${brl(v)}</span>${f<=0.004?`<span class="pill ok">Pago</span>`:+a.pagoValor>0?`<span class="pill warn">Parcial</span>`:`<span class="pill bad">Aberto</span>`}</div>`}).join("")||`<div class="empty">Tu não deve nada pro teu pai 🎉</div>`}
+      <p class="muted" style="margin:8px 0 0;font-size:12px">Quando um projeto é pago pro teu pai, abate daqui começando pelo mês mais antigo.</p></div>`;
   } else {
     el.innerHTML=`<p class="muted" style="margin:8px 0 12px">Toque num empreendimento pra ver os detalhes.</p>
     <button class="bizbig tat" data-act="abrirNeg" data-v="tattoo">
@@ -667,6 +698,11 @@ function rNegocios(){
       <div class="tl"><span>🔮 Tarot</span><span>›</span></div>
       <div class="tv">${brl(tr.recebido)}</div><small class="lbl">recebido</small>
       <div class="tin"><div><small>A receber</small><b>${brl(tr.aReceber)}</b></div><div><small>Tiragens</small><b>${tr.tiragens}</b></div></div>
+    </button>
+    <button class="bizbig proj" data-act="abrirNeg" data-v="projetos">
+      <div class="tl"><span>📐 Projetos</span><span>›</span></div>
+      <div class="tv">${brl(pr.recebido)}</div><small class="lbl">recebido</small>
+      <div class="tin"><div><small>A receber</small><b>${brl(pr.aReceber)}</b></div><div><small>Devo pro pai</small><b>${brl(sum(dividaPai(),apFalta))}</b></div></div>
     </button>`;
   }
 }
@@ -788,6 +824,39 @@ async function aplicarPagTattoo(v,contaId){
   if(PREVIA){try{localStorage.setItem("fin-previa-frana",JSON.stringify(FR))}catch(e){}}
   S.entradas.push({id:uid(),data:HOJE,desc:"Tattoo me pagou",valor:v,conta:contaId}); mexeSaldo(contaId,v);
 }
+let pForm={};
+function sheetProj(){
+  openSheet(`<div style="display:flex;justify-content:space-between;align-items:center"><h3>📐 Novo projeto</h3><button class="x" data-act="fechar" aria-label="Fechar">×</button></div>
+  <div class="stack" style="margin-top:10px">
+    <label class="f">Valor<input class="bigval" id="pValor" type="text" inputmode="decimal" placeholder="0,00"></label>
+    <label class="f">Projeto<input id="pDesc" placeholder="Ex.: layout da máquina X"></label>
+    <label class="f">Cliente<input id="pCli" placeholder="Nome de quem encomendou"></label>
+    <label class="f">Data<input id="pData" type="date" value="${HOJE}"></label>
+    <button class="btn full" style="font-size:16px;padding:15px;background:#2F95B8" data-act="addProj">Salvar projeto</button></div>`);
+}
+function sheetReceber(p){
+  pForm={id:p.id,quem:pForm.id===p.id&&pForm.quem||"pai",conta:pForm.conta||"sicredi"};
+  const pl=planoPai(+p.valor||0);
+  openSheet(`<div style="display:flex;justify-content:space-between;align-items:center"><h3>Receber ${brl(p.valor)}</h3><button class="x" data-act="fechar" aria-label="Fechar">×</button></div>
+  <p class="muted" style="margin:4px 0 0">${esc(p.desc||"Projeto")}</p>
+  <div class="stack" style="margin-top:12px">
+    <div><span class="muted" style="font-weight:600">Quem recebeu o dinheiro?</span><div class="chips"><button class="chip" style="--c:#2F95B8" aria-pressed="${pForm.quem==="pai"}" data-act="pQuem" data-v="pai">👨 Meu pai</button><button class="chip" aria-pressed="${pForm.quem==="eu"}" data-act="pQuem" data-v="eu">🙋‍♀️ Eu</button></div></div>
+    ${pForm.quem==="eu"?`<div><span class="muted" style="font-weight:600">Entrou em</span><div class="chips">${S.contas.map(c=>`<button class="chip" style="--c:${c.cor}" aria-pressed="${pForm.conta===c.id}" data-act="pConta" data-v="${c.id}">${esc(c.nome)}</button>`).join("")}</div></div>`
+      :`<div class="parcbox" style="font-size:14px">${pl.out.length?`<b>Vai abater da dívida com o pai:</b><br>${pl.out.map(x=>`${esc(x.a.desc)} · ${mshort(x.a.mes)}: ${brl(x.t)}`).join("<br>")}`:"Tu não tem dívida aberta com o pai."}${pl.rest>0.004?`<br><span style="color:var(--bad)">Sobra ${brl(pl.rest)} que não abate nada (fica com o pai).</span>`:""}</div>`}
+    <button class="btn full" style="font-size:16px;padding:15px;background:var(--mint)" data-act="confirmaReceber">Confirmar</button></div>`);
+}
+function sheetEmpPai(){
+  pForm={...pForm,emp:pForm.emp||{parc:1,dest:"compra"}};const e=pForm.emp;
+  openSheet(`<div style="display:flex;justify-content:space-between;align-items:center"><h3>👨 Empréstimo do pai</h3><button class="x" data-act="fechar" aria-label="Fechar">×</button></div>
+  <div class="stack" style="margin-top:10px">
+    <label class="f">Valor emprestado<input class="bigval" id="epValor" type="text" inputmode="decimal" placeholder="0,00" value="${esc(e.valor||"")}"></label>
+    <label class="f">Pra quê<input id="epDesc" placeholder="Ex.: notebook" value="${esc(e.desc||"")}"></label>
+    <div class="parcbox"><span class="muted" style="font-weight:600">Vou devolver em</span><div class="stepper"><button data-act="epParc" data-d="-1">−</button><b>${e.parc}x</b><button data-act="epParc" data-d="1">+</button><span class="muted">a partir de</span></div>
+      <input id="epMes" type="month" value="${e.mes||shiftM(MES_HOJE,1)}" style="margin-top:8px;padding:8px 2px;border:0;border-bottom:1.5px solid var(--line);background:transparent;color:var(--ink);font:500 16px var(--body)"></div>
+    <div><span class="muted" style="font-weight:600">O dinheiro</span><div class="chips"><button class="chip" aria-pressed="${e.dest==="compra"}" data-act="epDest" data-v="compra">Foi direto na compra</button>${S.contas.map(c=>`<button class="chip" style="--c:${c.cor}" aria-pressed="${e.dest===c.id}" data-act="epDest" data-v="${c.id}">Entrou no ${esc(c.nome)}</button>`).join("")}</div></div>
+    <button class="btn full" style="font-size:16px;padding:15px" data-act="addEmpPai">Salvar empréstimo</button></div>`);
+}
+const lerEmp=()=>{if($("epValor"))pForm.emp={...pForm.emp,valor:$("epValor").value,desc:$("epDesc").value,mes:$("epMes").value}};
 function toast(t){let el=$("toast");if(!el){el=document.createElement("div");el.id="toast";el.style.cssText="position:fixed;left:50%;bottom:calc(84px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--paper);padding:12px 18px;border-radius:14px;font-weight:600;font-size:14px;z-index:60;box-shadow:0 8px 24px rgba(0,0,0,.2);transition:opacity .3s";document.body.appendChild(el)}
   el.textContent=t;el.style.opacity="1";clearTimeout(el._t);el._t=setTimeout(()=>el.style.opacity="0",2200)}
 function openSheet(html){$("sheet").innerHTML=html;$("sheetBg").classList.add("on")}
@@ -828,11 +897,12 @@ function sheetAjustes(){
        <button class="del" data-act="delFixo" data-i="${i}">Apagar este fixo</button>`)).join("")}
     <button class="add" style="margin-top:10px" data-act="addFixo">+ Novo fixo</button>`;
   } else if(ajView==="apagar"){
-    h=ajHead("Contas a pagar")+`<p class="muted" style="margin-top:0">Contas que não se repetem, tipo o mecânico do pai.</p>
+    h=ajHead("Contas a pagar")+`<p class="muted" style="margin-top:0">Contas que não se repetem. Marca "Meu pai" nas que são com ele, pra projetos pagos a ele abaterem daqui.</p>
     ${S.aPagar.map((a,i)=>ajRow(i,esc(a.desc),mshort(a.mes)+(a.pago?" · paga":""),`<span class="num" style="font-weight:700">${brl(a.valor)}</span>`,
       `<label class="f">Descrição<input data-ap="${i}" data-f="desc" value="${esc(a.desc)}"></label>
        <div class="grid2"><label class="f">Valor<input type="text" inputmode="decimal" data-ap="${i}" data-f="valor" value="${inV(a.valor)}"></label>
        <label class="f">Mês<input type="month" data-ap="${i}" data-f="mes" value="${a.mes}"></label></div>
+       <div><span class="muted" style="font-weight:600">É com</span><div class="chips"><button class="chip" aria-pressed="${a.credor==="pai"}" style="--c:#2F95B8" data-act="apCredor" data-i="${i}" data-v="pai">👨 Meu pai</button><button class="chip" aria-pressed="${a.credor!=="pai"}" data-act="apCredor" data-i="${i}" data-v="">Outro</button></div></div>
        <button class="del" data-act="delAPagar" data-i="${i}">Apagar esta conta</button>`)).join("")||`<div class="empty">Nenhuma conta.</div>`}
     <button class="add" style="margin-top:10px" data-act="addAPagar">+ Nova conta</button>`;
   } else if(ajView==="cats"){
@@ -862,7 +932,7 @@ function mexeSaldo(id,delta){const c=conta(id);if(c)c.saldo=Math.round(((+c.sald
 function pagar(t,k,v,contaId){
   if(t==="fatura")S.faturaPaga[k]={conta:contaId,valor:v,data:HOJE};
   else if(t==="fixo")S.fixosPagos[k]={conta:contaId,valor:v};
-  else {const a=S.aPagar.find(x=>x.id===k);if(a)a.pago={conta:contaId,data:HOJE}}
+  else {const a=S.aPagar.find(x=>x.id===k);if(a){a.pagoValor=+a.valor||0;a.pago={conta:contaId,data:HOJE}}}
   mexeSaldo(contaId,-v);
 }
 function commit(){render();queueSave()}
@@ -911,6 +981,29 @@ document.addEventListener("click",e=>{
     form.inbox=null;closeSheet();tirarInbox(b.dataset.id).then(()=>{commit();save();toast(fx&&fx[2]!=="cartao"?`${fx[0]} marcado como pago`:"Ok, já conta na fatura");if(INBOX.length)sheetInbox()})}
   else if(a==="ignorar"){if(!confirma(b,"Ignorar este gasto? Ele sai da lista sem ser lançado."))return;tirarInbox(b.dataset.id).then(()=>{render();sheetInbox()})}
   else if(a==="tatConta"){S.tatConta=b.dataset.v;commit();sheetAjustes()}
+  else if(a==="novoProj"){sheetProj();setTimeout(()=>$("pValor")?.focus(),50)}
+  else if(a==="addProj"){const v=num($("pValor").value);if(v<=0){$("pValor").focus();toast("Coloque o valor");return}
+    S.projetos.push({id:uid(),data:$("pData").value||HOJE,desc:$("pDesc").value.trim(),cliente:$("pCli").value.trim(),valor:v,pago:false});closeSheet();commit();save();toast("Projeto salvo")}
+  else if(a==="recebiProj"){const p=S.projetos.find(x=>x.id===b.dataset.id);if(p){pForm={};sheetReceber(p)}}
+  else if(a==="pQuem"){pForm.quem=b.dataset.v;sheetReceber(S.projetos.find(x=>x.id===pForm.id))}
+  else if(a==="pConta"){pForm.conta=b.dataset.v;sheetReceber(S.projetos.find(x=>x.id===pForm.id))}
+  else if(a==="confirmaReceber"){const p=S.projetos.find(x=>x.id===pForm.id);if(!p)return;
+    p.pago=true;p.pagoEm=HOJE;p.recebidoPor=pForm.quem;
+    if(pForm.quem==="eu"){p.conta=pForm.conta;S.entradas.push({id:uid(),data:HOJE,desc:`Projeto: ${p.desc||"projeto"}`,valor:+p.valor,conta:p.conta,projeto:p.id});mexeSaldo(p.conta,+p.valor);toast(`Entrou ${brl(p.valor)}`)}
+    else{const r=abaterPai(+p.valor,`Projeto: ${p.desc||""}`);p.abateu=r.out.map(x=>({id:x.a.id,valor:x.t}));toast(`Abateu ${brl(+p.valor-r.rest)} da dívida com o pai`)}
+    closeSheet();commit();save()}
+  else if(a==="delProj"){const p=S.projetos.find(x=>x.id===b.dataset.id);if(!p||!confirma(b,"Apagar este projeto? Desfaz o que ele abateu ou entrou."))return;
+    if(p.pago&&p.recebidoPor==="eu"){const en=S.entradas.find(x=>x.projeto===p.id);if(en){mexeSaldo(en.conta,-en.valor);S.entradas=S.entradas.filter(x=>x!==en)}}
+    if(p.pago&&p.recebidoPor==="pai")(p.abateu||[]).forEach(x=>{const ap=S.aPagar.find(y=>y.id===x.id);if(ap){ap.pagoValor=Math.max(0,Math.round(((+ap.pagoValor||0)-x.valor)*100)/100);if(apFalta(ap)>0.004)delete ap.pago}});
+    S.projetos=S.projetos.filter(x=>x!==p);commit()}
+  else if(a==="novoEmpPai"){pForm={emp:{parc:1,dest:"compra"}};sheetEmpPai()}
+  else if(a==="epParc"){lerEmp();pForm.emp.parc=Math.max(1,Math.min(48,pForm.emp.parc+(+b.dataset.d)));sheetEmpPai()}
+  else if(a==="epDest"){lerEmp();pForm.emp.dest=b.dataset.v;sheetEmpPai()}
+  else if(a==="addEmpPai"){lerEmp();const e=pForm.emp,v=num(e.valor);if(v<=0){toast("Coloque o valor");return}
+    const n=e.parc,cent=Math.round(v*100),base=Math.floor(cent/n),ini=e.mes||shiftM(MES_HOJE,1),d=(e.desc||"").trim()||"Empréstimo";
+    for(let i=0;i<n;i++)S.aPagar.push({id:uid(),credor:"pai",desc:`${d} (pai)${n>1?` ${i+1}/${n}`:""}`,valor:(i===n-1?cent-base*(n-1):base)/100,mes:shiftM(ini,i)});
+    if(e.dest!=="compra"){S.entradas.push({id:uid(),data:HOJE,desc:`Empréstimo do pai: ${d}`,valor:v,conta:e.dest});mexeSaldo(e.dest,v)}
+    closeSheet();commit();save();toast(`Empréstimo de ${brl(v)} em ${n}x salvo`)}
   else if(a==="tatPagou"){sheetTatPagou();setTimeout(()=>$("tpValor")?.focus(),50)}
   else if(a==="tatPagouSalvar"){const v=num($("tpValor").value);if(v<=0){$("tpValor").focus();toast("Coloque o valor");return}
     const sel=document.querySelector('[data-act="eConta"][aria-pressed="true"]');const c=sel?sel.dataset.v:S.contas[0].id;
@@ -941,6 +1034,7 @@ document.addEventListener("click",e=>{
   else if(a==="ajView"){ajView=b.dataset.v;ajOpen=null;sheetAjustes()}
   else if(a==="ajVoltar"){ajView=null;ajOpen=null;sheetAjustes()}
   else if(a==="ajOpen"){const i=+b.dataset.i;ajOpen=ajOpen===i?null:i;sheetAjustes()}
+  else if(a==="apCredor"){const x=S.aPagar[+b.dataset.i];if(b.dataset.v)x.credor="pai";else delete x.credor;commit();sheetAjustes()}
   else if(a==="fxTipo"){S.fixos[+b.dataset.i][2]=b.dataset.v;commit();sheetAjustes()}
   else if(a==="catCor"){S.cats[+b.dataset.i].c=b.dataset.v;commit();sheetAjustes()}
   else if(a==="fechar"){closeSheet()}
@@ -992,6 +1086,7 @@ function merge(o){
     S=n; return;
   }
   S=Object.assign(structuredClone(DEFAULTS),o); S.cartao=Object.assign({fecha:28,vence:13,limite:8150},S.cartao||{});
+  (S.aPagar||[]).forEach(a=>{if(!a.credor&&/\(pai\)|\bpai\b/i.test(a.desc||""))a.credor="pai"}); S.projetos=S.projetos||[];
 }
 let save=()=>{};
 render(); setSave("Carregando…");

@@ -299,7 +299,7 @@ footer{margin-top:30px;font-size:12px;color:var(--soft);text-align:center}
 <div class="tab" id="t-metas"></div>
 <div class="tab" id="t-negocios"></div>
 
-<footer>Pra planejar e acompanhar. Não é consultoria financeira.<br><span style="opacity:.6">versão 25/09 · 3</span></footer>
+<footer>Pra planejar e acompanhar. Não é consultoria financeira.<br><span style="opacity:.6">versão 26/09 · 1</span></footer>
 </main>
 
 <nav class="bn"><div class="in" role="tablist">
@@ -399,6 +399,7 @@ const DEFAULTS={
   ],
   gastos:[],        // {id,data,desc,valor,cat,forma}  forma = id da conta ou "cartao"
   entradas:[],      // {id,data,desc,valor,conta}
+  transf:[],        // {id,data,de,para,valor,desc}  dinheiro que só muda de lugar
   tarot:[],         // {id,data,desc,valor}
   fixos:[["Iza (psicóloga)",200,"bolso"],["Spotify",31.9,"bolso"],["Whey",200,"bolso"],["Seguro do carro",91.5,"bolso"],
          ["Academia",139.9,"cartao"],["RMS (internet)",99.9,"cartao"],["iCloud",19.9,"cartao"],["iFood",9.9,"cartao"],["Amazon",19.9,"cartao"],["Lumberjack (cabelo)",45,"cartao"],["Vivo",75,"cartao"],["Meli+",9.9,"cartao"]],
@@ -613,7 +614,9 @@ function rBancos(){
   <h2>Contas</h2>
   <div class="banks">${S.contas.map((c,i)=>`<div class="bank" style="background:linear-gradient(145deg,${c.cor},${c.cor}cc)"><div class="n">${esc(c.nome)}</div><div class="t">${c.tipo==="fisico"?"Físico":"Virtual"}</div>
     <input type="text" inputmode="decimal" data-saldo="${i}" value="${inV(c.saldo)}" aria-label="Saldo ${esc(c.nome)}"></div>`).join("")}</div>
+  <button class="btn full ghost" style="margin-top:4px;font-size:15px;padding:13px" data-act="novaTransf">⇄ Depositar ou transferir</button>
   <p class="muted">Toque no valor pra ajustar o saldo. Os gastos e pagamentos descontam da conta escolhida sozinhos.</p>
+  ${(S.transf||[]).length?`<h2>Transferências</h2><div class="card">${[...S.transf].sort((a,b)=>(b.data||"").localeCompare(a.data||"")).slice(0,10).map(t=>`<div class="item"><div class="dot" style="background:var(--violet-bg)">⇄</div><div class="tx"><div>${esc(conta(t.de)?.nome||"?")} → ${esc(conta(t.para)?.nome||"?")}</div><span class="muted">${dBR(t.data)}${t.desc?" · "+esc(t.desc):""}</span></div><span class="val num">${brl(t.valor)}</span><button class="del" data-act="delTransf" data-id="${t.id}" aria-label="Apagar transferência">×</button></div>`).join("")}</div>`:""}
   <h2 style="display:flex;justify-content:space-between;align-items:center">Entradas <button class="btn sm" data-act="novaEntrada">+ Entrada</button></h2>
   <div class="card">${ents.length?ents.map(e=>`<div class="item"><div class="dot" style="background:${conta(e.conta)?.cor||"#888"}22">⬇️</div><div class="tx"><div>${esc(e.desc||"Entrada")}</div><span class="muted">${dBR(e.data)} · ${esc(conta(e.conta)?.nome||"")}</span></div><span class="val" style="color:${e.valor<0?"var(--bad)":"var(--mint)"}">${e.valor<0?"":"+"}${brl(e.valor)}</span><button class="x" data-act="delEntrada" data-id="${e.id}" aria-label="Apagar">×</button></div>`).join(""):`<div class="empty">Salário, vale, Pix recebido… registre aqui.</div>`}</div>`;
 }
@@ -842,6 +845,21 @@ function sheetEntrada(msg=""){
     <div><span class="muted" style="font-weight:600">Entrou em</span><div class="chips">${S.contas.map((c,i)=>`<button class="chip" style="--c:${c.cor}" aria-pressed="${i===0}" data-act="eConta" data-v="${c.id}">${esc(c.nome)}</button>`).join("")}</div></div>
     ${msg?`<div style="color:var(--bad);font-weight:600;font-size:14px">${msg}</div>`:""}
     <button class="btn full" style="font-size:16px;padding:15px" data-act="addEntrada">Salvar entrada</button></div>`);
+}
+let trForm={};
+function sheetTransf(msg=""){
+  const v=$("trValor")?.value||"", d=$("trDesc")?.value||"", dt=$("trData")?.value||HOJE;
+  const chips=(lado)=>S.contas.map(c=>`<button class="chip" style="--c:${c.cor}" aria-pressed="${trForm[lado]===c.id}" data-act="trConta" data-lado="${lado}" data-v="${c.id}">${esc(c.nome)}</button>`).join("");
+  openSheet(`<div style="display:flex;justify-content:space-between;align-items:center"><h3>⇄ Depositar ou transferir</h3><button class="x" data-act="fechar" aria-label="Fechar">×</button></div>
+  <div class="stack" style="margin-top:10px">
+    <label class="f">Valor<input class="bigval" id="trValor" type="text" inputmode="decimal" placeholder="0,00" value="${esc(v)}"></label>
+    <div><span class="muted" style="font-weight:600">Saiu de</span><div class="chips">${chips("de")}</div></div>
+    <div><span class="muted" style="font-weight:600">Foi para</span><div class="chips">${chips("para")}</div></div>
+    <label class="f">Data<input id="trData" type="date" value="${dt}"></label>
+    <label class="f">Descrição (opcional)<input id="trDesc" placeholder="Ex.: depósito no caixa, Pix pro PagBank" value="${esc(d)}"></label>
+    <p class="muted" style="margin:0">Não conta como gasto nem como entrada: o dinheiro só muda de lugar.</p>
+    ${msg?`<div style="color:var(--bad);font-weight:600;font-size:14px">${msg}</div>`:""}
+    <button class="btn full" style="font-size:16px;padding:15px" data-act="addTransf">Salvar</button></div>`);
 }
 let tForm={qtd:1,pago:true};
 function sheetTarot(msg=""){
@@ -1102,6 +1120,13 @@ document.addEventListener("click",e=>{
   else if(a==="tatPagouSalvar"){const v=num($("tpValor").value);if(v<=0){$("tpValor").focus();toast("Coloque o valor");return}
     const sel=document.querySelector('[data-act="eConta"][aria-pressed="true"]');const c=sel?sel.dataset.v:S.contas[0].id;
     closeSheet();aplicarPagTattoo(v,c).then(()=>{commit();save();toast(`Tattoo pagou ${brl(v)}`)})}
+  else if(a==="novaTransf"){const f=S.contas.find(c=>c.tipo==="fisico"),vt=S.contas.find(c=>c.tipo!=="fisico");trForm={de:(f||S.contas[0]).id,para:(vt||S.contas[1]||S.contas[0]).id};$("sheet").innerHTML="";sheetTransf();setTimeout(()=>$("trValor")?.focus(),50)}
+  else if(a==="trConta"){const lado=b.dataset.lado,out=lado==="de"?"para":"de";if(trForm[out]===b.dataset.v)trForm[out]=trForm[lado];trForm[lado]=b.dataset.v;sheetTransf()}
+  else if(a==="addTransf"){const v=num($("trValor").value);if(v<=0){$("trValor").focus();toast("Coloque o valor");return}
+    if(!trForm.de||!trForm.para||trForm.de===trForm.para){sheetTransf("Escolhe contas diferentes pra origem e destino");return}
+    const t={id:uid(),data:$("trData").value||HOJE,de:trForm.de,para:trForm.para,valor:v,desc:$("trDesc").value.trim()};
+    (S.transf=S.transf||[]).push(t);mexeSaldo(t.de,-v);mexeSaldo(t.para,v);closeSheet();commit();save();toast(`${brl(v)}: ${conta(t.de)?.nome} → ${conta(t.para)?.nome}`)}
+  else if(a==="delTransf"){const t=(S.transf||[]).find(x=>x.id===b.dataset.id);if(!t||!confirma(b,"Desfazer esta transferência? Os saldos voltam."))return;mexeSaldo(t.de,+t.valor);mexeSaldo(t.para,-t.valor);S.transf=S.transf.filter(x=>x!==t);commit()}
   else if(a==="novaEntrada"){sheetEntrada();setTimeout(()=>$("eValor")?.focus(),50)}
   else if(a==="eConta"){document.querySelectorAll('[data-act="eConta"]').forEach(x=>x.setAttribute("aria-pressed",x===b))}
   else if(a==="addEntrada"){const v=num($("eValor").value);if(v<=0){$("eValor").focus();toast("Coloque o valor da entrada");return}

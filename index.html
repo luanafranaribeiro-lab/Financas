@@ -207,6 +207,7 @@ nav.bn button[aria-selected="true"]::after{content:"";position:absolute;top:0;le
 .tatchip[aria-pressed="false"]{border-color:#C04FD6;color:#C04FD6}
 .tatnote{display:flex;gap:12px;align-items:center;background:linear-gradient(135deg,#FF5C9E22,#3E7BFF22);border:1px solid #C04FD655;border-radius:16px;padding:12px 14px;margin-top:14px}
 .tatnote>span{font-size:22px}.tatnote b{display:block;font-size:15px}.tatnote small{color:var(--soft);font-size:12px}
+.edpen{font-size:12px;color:var(--soft);opacity:.7}
 /* rings */
 .rings{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
 .ring{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:14px;text-align:center}
@@ -299,7 +300,7 @@ footer{margin-top:30px;font-size:12px;color:var(--soft);text-align:center}
 <div class="tab" id="t-metas"></div>
 <div class="tab" id="t-negocios"></div>
 
-<footer>Pra planejar e acompanhar. Não é consultoria financeira.<br><span style="opacity:.6">versão 26/09 · 1</span></footer>
+<footer>Pra planejar e acompanhar. Não é consultoria financeira.<br><span style="opacity:.6">versão 27/09 · 1</span></footer>
 </main>
 
 <nav class="bn"><div class="in" role="tablist">
@@ -409,7 +410,8 @@ const DEFAULTS={
   cartao:{fecha:28,vence:13,limite:8150}, // cartão Sicredi
   projetos:[],  // {id,data,desc,cliente,valor,pago,recebidoPor,conta}
   tatConta:"sicredi", // onde entram os pagamentos da tattoo feitos pelo Frana
-  tatVisto:null,      // quanto de cada reembolso já foi lançado como entrada
+  tatVisto:null,      // quanto de cada reembolso já foi visto (reembolso não mexe mais no banco)
+  cliVisto:null,      // quanto de cada tattoo paga pelo cliente já entrou no banco
   aPagar:[
     {id:"mec1",credor:"pai",desc:"Mecânico (pai)",valor:250,mes:"2026-10"},
     {id:"mec2",credor:"pai",desc:"Mecânico (pai)",valor:280.87,mes:"2026-10"},
@@ -603,7 +605,7 @@ function rGastos(){
      <div class="legend">${pc.map(([n,v])=>`<div><i style="background:${cat(n).c}"></i><span>${cat(n).e} ${esc(n)}</span><b class="num">${Math.round(v/tot*100)}%</b></div>`).join("")}</div></div>`:""}
   ${pc.length?`<div class="catgrid">${pc.map(([n,v])=>{const c=cat(n);return `<button class="catcard" style="background:${c.c}" data-act="catopen" data-v="${esc(n)}"><span class="e">${c.e}</span><b>${brl(v)}</b><small>${esc(n)} · ${gastosMes(curG).filter(g=>(g.cat||"Outros")===n).length}x</small><span class="share" style="width:${tot?v/tot*100:0}%"></span></button>`}).join("")}</div>`:`<div class="card empty">Sem gastos em ${mfull(curG)}.</div>`}
   <h2>${catOpen?`${cat(catOpen).e} ${esc(catOpen)} <button class="btn sm ghost" data-act="catopen" data-v="">Ver todos</button>`:"Lançamentos"}</h2>
-  <div class="card">${(catOpen?lista.filter(g=>(g.cat||"Outros")===catOpen):lista).map(g=>{const c=cat(g.cat);return `<div class="item"><div class="dot" style="background:${c.c}22">${c.e}</div><div class="tx"><div>${esc(g.desc||c.n)}</div><span class="muted">${dBR(g.data)} · <span style="color:${formaCor(g.forma)};font-weight:700">${esc(formaNome(g.forma))}${g.parcelas>1?` ${g.parcelas}x`:""}</span></span></div><span class="val">${brl(g.valor)}</span><button class="x" data-act="delGasto" data-id="${g.id}" aria-label="Apagar">×</button></div>`}).join("")||`<div class="empty">Nada por aqui ainda.</div>`}</div>`;
+  <div class="card">${(catOpen?lista.filter(g=>(g.cat||"Outros")===catOpen):lista).map(g=>{const c=cat(g.cat);return `<div class="item"><div class="dot" style="background:${c.c}22">${c.e}</div><div class="tx" data-act="editGasto" data-id="${g.id}" style="cursor:pointer"><div>${esc(g.desc||c.n)} <span class="edpen" aria-hidden="true">✎</span></div><span class="muted">${dBR(g.data)} · <span style="color:${formaCor(g.forma)};font-weight:700">${esc(formaNome(g.forma))}${g.parcelas>1?` ${g.parcelas}x`:""}</span></span></div><span class="val">${brl(g.valor)}</span><button class="x" data-act="delGasto" data-id="${g.id}" aria-label="Apagar">×</button></div>`}).join("")||`<div class="empty">Nada por aqui ainda.</div>`}</div>`;
 }
 
 function rBancos(){
@@ -714,7 +716,7 @@ function rNegocios(){
     <div class="tatcard"><div class="tl"><span>🖋️ Saldo da tattoo</span><span class="muted2">igual ao lucro do Frana</span></div>
       <div class="tv" style="color:${ts.saldo<0?"#FF9DB0":"#fff"}">${brl(ts.saldo)}</div>
       <div class="tin"><div><small>Te deve no total</small><b>${brl(tatDeveTotal())}</b></div><div><small>Tattoos feitas</small><b>${FR.tattoos.length}</b></div></div></div>
-    ${tatDeveTotal()>0?`<button class="btn full" style="margin-top:10px;font-size:16px;padding:14px;background:var(--mint)" data-act="tatPagou">+ A tattoo me pagou</button>`:""}
+    ${tatDeveTotal()>0?`<button class="btn full" style="margin-top:10px;font-size:16px;padding:14px;background:var(--mint)" data-act="tatPagou">✓ Acertar reembolso</button>`:""}
     <div class="card" style="margin-top:10px"><div class="klist">
       <span>Faturamento</span><span style="color:var(--mint)">+${brl(ts.fat)}</span>
       <span>Materiais usados</span><span>−${brl(ts.mat)}</span>
@@ -821,9 +823,9 @@ function parcInfo(){const n=form.parcelas||1,v=num(form.valor);const ini=primeir
   return (v>0?`${n}x de ${brl(v/n)} · `:"")+`1ª na fatura de ${mshort(ini)}`+(n>1?` até ${mshort(shiftM(ini,n-1))}`:"")}
 function sheetGasto(msg=""){
   const formas=[...S.contas.map(c=>[c.id,c.nome,c.cor]),["cartao","Cartão Sicredi","#7B5CF0"]];
-  openSheet(`<div style="display:flex;justify-content:space-between;align-items:center"><h3>${form.inbox?"Classificar gasto":"Novo gasto"}</h3><button class="x" data-act="fechar" aria-label="Fechar">×</button></div>
+  openSheet(`<div style="display:flex;justify-content:space-between;align-items:center"><h3>${form.edit?"Editar gasto":form.inbox?"Classificar gasto":"Novo gasto"}</h3><button class="x" data-act="fechar" aria-label="Fechar">×</button></div>
   <div class="stack" style="margin-top:10px">
-    ${form.inbox&&(()=>{const x=INBOX.find(i=>i.id===form.inbox);const fx=x&&pareceFixo(x);return fx?`<div class="fxwarn"><b>Parece o fixo "${esc(fx[0])}"</b><span>${fx[2]==="cartao"?"Ele já entra sozinho na fatura todo mês.":"Ele já aparece em Pra pagar todo mês."} Se for ele, não lança de novo:</span><button class="btn sm" data-act="inboxFixo" data-id="${x.id}" data-k="${esc(fx[0])}">É o fixo, não lançar</button></div>`:""})()}
+    ${!form.inbox?"":(()=>{const x=INBOX.find(i=>i.id===form.inbox);const fx=x&&pareceFixo(x);return fx?`<div class="fxwarn"><b>Parece o fixo "${esc(fx[0])}"</b><span>${fx[2]==="cartao"?"Ele já entra sozinho na fatura todo mês.":"Ele já aparece em Pra pagar todo mês."} Se for ele, não lança de novo:</span><button class="btn sm" data-act="inboxFixo" data-id="${x.id}" data-k="${esc(fx[0])}">É o fixo, não lançar</button></div>`:""})()}
     <label class="f">Valor<input class="bigval" id="gValor" type="text" inputmode="decimal" placeholder="0,00" value="${esc(form.valor)}"></label>
     <label class="f">Descrição<input id="gDesc" placeholder="Ex.: mercado da semana" value="${esc(form.desc)}"></label>
     <div><span class="muted" style="font-weight:600">Categoria</span><div class="chips"><button class="chip tatchip" style="--c:#C04FD6" aria-pressed="${form.cat===TATCAT.n}" data-act="fcat" data-v="${TATCAT.n}">🖋️ Frana Tattoo</button>${S.cats.map(c=>`<button class="chip" style="--c:${c.c}" aria-pressed="${form.cat===c.n}" data-act="fcat" data-v="${esc(c.n)}">${c.e} ${esc(c.n)}</button>`).join("")}</div></div>
@@ -834,7 +836,7 @@ function sheetGasto(msg=""){
       <span class="muted" id="parcInfo">${parcInfo()}</span></div></div>`:""}
     <label class="f">Data<input id="gData" type="date" value="${form.data}"></label>
     ${msg?`<div style="color:var(--bad);font-weight:600;font-size:14px">${msg}</div>`:""}
-    <button class="btn full" style="font-size:16px;padding:15px" data-act="addGasto">Salvar gasto</button>
+    <button class="btn full" style="font-size:16px;padding:15px" data-act="addGasto">${form.edit?"Salvar alterações":"Salvar gasto"}</button>
   </div>`);
 }
 function sheetEntrada(msg=""){
@@ -878,12 +880,12 @@ function sheetTarot(msg=""){
 function pendReemb(){return FR.reembolsos.filter(r=>(+r.value||0)-tatPago(r)>0.004).sort((a,b)=>(a.date||"").localeCompare(b.date||""))}
 function planoAbate(v){const out=[];let rest=v;for(const r of pendReemb()){if(rest<=0.004)break;const f=(+r.value||0)-tatPago(r),t=Math.min(rest,f);out.push({r,t});rest=Math.round((rest-t)*100)/100}return {out,rest}}
 function sheetTatPagou(){
-  openSheet(`<div style="display:flex;justify-content:space-between;align-items:center"><h3>🖋️ A tattoo me pagou</h3><button class="x" data-act="fechar" aria-label="Fechar">×</button></div>
+  openSheet(`<div style="display:flex;justify-content:space-between;align-items:center"><h3>🖋️ Acertar reembolso</h3><button class="x" data-act="fechar" aria-label="Fechar">×</button></div>
   <div class="stack" style="margin-top:10px">
     <label class="f">Valor<input class="bigval" id="tpValor" type="text" inputmode="decimal" placeholder="0,00"></label>
-    <div><span class="muted" style="font-weight:600">Entrou em</span><div class="chips">${S.contas.map((c,i)=>`<button class="chip" style="--c:${c.cor}" aria-pressed="${i===0}" data-act="eConta" data-v="${c.id}">${esc(c.nome)}</button>`).join("")}</div></div>
+    <div class="muted" style="font-size:13px">É só um acerto entre ti e a tattoo: o saldo do banco não muda, porque o dinheiro dos clientes já entrou nele.</div>
     <div class="muted" id="tpPlano">Abate primeiro o mês mais antigo que ainda está pendente.</div>
-    <button class="btn full" style="font-size:16px;padding:15px;background:var(--mint)" data-act="tatPagouSalvar">Salvar pagamento</button></div>`);
+    <button class="btn full" style="font-size:16px;padding:15px;background:var(--mint)" data-act="tatPagouSalvar">Marcar como pago</button></div>`);
 }
 document.addEventListener("input",e=>{if((e.target.id==="gValor"||e.target.id==="gData")&&$("parcInfo")){setTimeout(()=>{saveForm();$("parcInfo").textContent=parcInfo()},0)}});
 document.addEventListener("change",e=>{if(e.target.id==="gData"&&$("parcInfo")){saveForm();$("parcInfo").textContent=parcInfo()}});
@@ -891,17 +893,23 @@ document.addEventListener("input",e=>{if(e.target.id!=="tpValor")return;setTimeo
   $("tpPlano").innerHTML=v>0?"Vai abater: "+p.out.map(x=>`${mshort(x.r.date.slice(0,7))} ${brl(x.t)}`).join(" · ")+(p.rest>0?` · sobra ${brl(p.rest)}`:""):"Abate primeiro o mês mais antigo que ainda está pendente."},0)});
 /* pagamentos registrados no Frana viram entrada na conta escolhida */
 function sincTatEntradas(){
-  if(!FR.reembolsos.length&&!S.tatVisto)return false;
-  const primeira=!S.tatVisto; S.tatVisto=S.tatVisto||{}; let mudou=primeira;
-  for(const r of FR.reembolsos){
-    const cur=Math.round(tatPago(r)*100)/100, seen=S.tatVisto[r.id];
-    if(primeira||seen===undefined){S.tatVisto[r.id]=cur;mudou=true;continue}
-    const d=Math.round((cur-seen)*100)/100; if(Math.abs(d)<0.01)continue;
-    const c=conta(S.tatConta)?S.tatConta:S.contas[0].id;
-    S.entradas.push({id:uid(),data:HOJE,desc:d>0?`Tattoo me pagou (Frana) · ${r.desc||""}`:`Ajuste: pagamento desfeito no Frana · ${r.desc||""}`,valor:d,conta:c,auto:true});
-    mexeSaldo(c,d); S.tatVisto[r.id]=cur; mudou=true;
-    if(d>0)setTimeout(()=>toast(`Tattoo pagou ${brl(d)} → ${conta(c)?.nome}`),300);
+  let mudou=false;
+  /* reembolsos: o dinheiro dos clientes já cai no banco, então pagar reembolso é só acerto interno (não mexe em saldo) */
+  S.tatVisto=S.tatVisto||{};
+  for(const r of FR.reembolsos){const cur=Math.round(tatPago(r)*100)/100;if(S.tatVisto[r.id]!==cur){S.tatVisto[r.id]=cur;mudou=true}}
+  /* dinheiro dos clientes: cada tattoo paga vira entrada na conta escolhida (a partir de quando isso foi ligado) */
+  if(!FR.tattoos.length&&!S.cliVisto)return mudou;
+  const primeira=!S.cliVisto; S.cliVisto=S.cliVisto||{}; if(primeira)mudou=true;
+  const c=conta(S.tatConta)?S.tatConta:S.contas[0].id; let novo=0;
+  for(const t of FR.tattoos){
+    const cur=Math.round((t.pago!==false?(+t.value||0):(+t.received||0))*100)/100, seen=S.cliVisto[t.id];
+    if(primeira){S.cliVisto[t.id]=cur;continue}
+    const d=Math.round((cur-(seen||0))*100)/100; if(Math.abs(d)<0.01){if(seen===undefined){S.cliVisto[t.id]=cur;mudou=true}continue}
+    const quem=t.client?t.client:(t.type||"cliente");
+    S.entradas.push({id:uid(),data:t.date||HOJE,desc:d>0?`Tattoo · ${quem}`:`Ajuste tattoo · ${quem}`,valor:d,conta:c,auto:true,tattooId:t.id});
+    mexeSaldo(c,d); S.cliVisto[t.id]=cur; mudou=true; novo+=d;
   }
+  if(novo>0)setTimeout(()=>toast(`Tattoo: +${brl(novo)} → ${conta(c)?.nome}`),300);
   return mudou;
 }
 /* compra da tattoo -> reembolso pendente no Frana (uma linha por parcela, vencendo junto com a fatura) */
@@ -933,7 +941,6 @@ async function aplicarPagTattoo(v,contaId){
     if(!PREVIA&&sb){const {id,...data}=r;const {error}=await sb.from("frana_docs").update({data}).eq("col","reembolsos").eq("id",id);if(error)console.error(error)}
   }
   if(PREVIA){try{localStorage.setItem("fin-previa-frana",JSON.stringify(FR))}catch(e){}}
-  S.entradas.push({id:uid(),data:HOJE,desc:"Tattoo me pagou",valor:v,conta:contaId}); mexeSaldo(contaId,v);
 }
 let pForm={};
 function sheetProj(){
@@ -996,7 +1003,7 @@ function sheetAjustes(){
       ${item("apagar","🔧","Contas a pagar",`${S.aPagar.filter(a=>!a.pago).length} em aberto`)}
       ${item("cats","🏷️","Categorias",`${S.cats.length} categorias`)}
       ${item("cartao","💳","Cartão Sicredi",`fecha dia ${S.cartao.fecha} · vence dia ${S.cartao.vence} · limite ${brl0(S.cartao.limite)}`)}
-      ${item("tattoo","🖋️","Pagamentos da tattoo",`entram em ${conta(S.tatConta)?.nome||"Sicredi"}`)}
+      ${item("tattoo","🖋️","Dinheiro das tattoos",`entra em ${conta(S.tatConta)?.nome||"Sicredi"}`)}
       ${PREVIA?item("previa","↺","Prévia","voltar pros dados originais"):item("conta","👤","Conta","sair")}
     </div>`;
   } else if(ajView==="fixos"){
@@ -1027,7 +1034,7 @@ function sheetAjustes(){
     <div class="grid2"><label class="f">Fecha no dia<input type="text" inputmode="numeric" data-card="fecha" value="${S.cartao.fecha}"></label><label class="f">Vence no dia<input type="text" inputmode="numeric" data-card="vence" value="${S.cartao.vence}"></label></div>
     <label class="f" style="margin-top:12px">Limite total<input type="text" inputmode="decimal" data-card="limite" value="${inV(S.cartao.limite)}"></label>`;
   } else if(ajView==="tattoo"){
-    h=ajHead("Pagamentos da tattoo")+`<p class="muted" style="margin-top:0">Quando tu registrar no Frana que a tattoo te pagou, o valor entra sozinho nesta conta:</p>
+    h=ajHead("Dinheiro das tattoos")+`<p class="muted" style="margin-top:0">Quando tu marca uma tattoo como paga no Frana, o valor que o cliente pagou entra sozinho nesta conta:</p>
     <div class="chips">${S.contas.map(c=>`<button class="chip" style="--c:${c.cor}" aria-pressed="${(S.tatConta||"sicredi")===c.id}" data-act="tatConta" data-v="${c.id}">${esc(c.nome)}</button>`).join("")}</div>`;
   } else if(ajView==="previa"){
     h=ajHead("Prévia")+`<p class="muted" style="margin-top:0">Apaga o que tu testou aqui e volta pros dados de exemplo.</p><button class="btn full ghost" data-act="resetPrevia">Voltar pros dados originais</button>`;
@@ -1072,14 +1079,26 @@ document.addEventListener("click",e=>{
   else if(a==="addGasto"){saveForm();const v=num(form.valor);
     if(v<=0){sheetGasto("Coloque o valor do gasto.");return}
     if(!form.cat){sheetGasto("Escolha uma categoria.");return}
-    const g={id:uid(),data:form.data||HOJE,desc:form.desc.trim(),valor:v,cat:form.cat,forma:form.forma};
+    const velho=form.edit?S.gastos.find(x=>x.id===form.edit):null;
+    if(velho&&ehTattoo(velho)&&FR.reembolsos.some(r=>r.gastoId===velho.id&&tatPago(r)>0)){sheetGasto("Essa compra da tattoo já teve pagamento no Frana, então não dá pra editar aqui. Ajusta lá no Frana.");return}
+    const g={id:velho?velho.id:uid(),data:form.data||HOJE,desc:form.desc.trim(),valor:v,cat:form.cat,forma:form.forma};
     if(g.forma==="cartao"&&(form.parcelas||1)>1)g.parcelas=form.parcelas;
-    S.gastos.push(g); if(g.forma!=="cartao")mexeSaldo(g.forma,-v);
-    if(ehTattoo(g))criarReembFrana(g);
+    if(velho){ // desfaz o lançamento antigo e aplica o novo no mesmo lugar
+      if(velho.forma!=="cartao")mexeSaldo(velho.forma,+velho.valor);
+      S.gastos[S.gastos.indexOf(velho)]=g; if(g.forma!=="cartao")mexeSaldo(g.forma,-v);
+      const muda=ehTattoo(velho)||ehTattoo(g);
+      if(muda)(ehTattoo(velho)?apagarReembFrana(velho):Promise.resolve()).then(()=>ehTattoo(g)?criarReembFrana(g):render());
+    } else {
+      S.gastos.push(g); if(g.forma!=="cartao")mexeSaldo(g.forma,-v);
+      if(ehTattoo(g))criarReembFrana(g);
+    }
+    const editou=!!velho; form.edit=null;
     const veioInbox=form.inbox; form.inbox=null;
     curG=g.data.slice(0,7); catOpen=null; closeSheet(); commit(); save();
     if(veioInbox){tirarInbox(veioInbox).then(()=>{render();if(INBOX.length&&tab==="inicio")sheetInbox()})}
-    toast(`Salvo: ${brl(v)} em ${g.cat}`)}
+    toast(editou?`Gasto atualizado: ${brl(v)}`:`Salvo: ${brl(v)} em ${g.cat}`)}
+  else if(a==="editGasto"){const g=S.gastos.find(x=>x.id===b.dataset.id);if(!g)return;
+    form={valor:inV(g.valor),desc:g.desc||"",cat:g.cat||"",forma:g.forma,data:g.data,inbox:null,parcelas:g.parcelas||1,edit:g.id};$("sheet").innerHTML="";sheetGasto()}
   else if(a==="delGasto"){const g=S.gastos.find(x=>x.id===b.dataset.id);if(!g||!confirma(b,"Apagar este gasto? O valor volta pro saldo da conta."))return;
     if(g.forma!=="cartao")mexeSaldo(g.forma,+g.valor);if(ehTattoo(g))apagarReembFrana(g).then(render);S.gastos=S.gastos.filter(x=>x!==g);commit()}
   else if(a==="catopen"){catOpen=b.dataset.v||null;rGastos()}
@@ -1119,7 +1138,7 @@ document.addEventListener("click",e=>{
   else if(a==="tatPagou"){sheetTatPagou();setTimeout(()=>$("tpValor")?.focus(),50)}
   else if(a==="tatPagouSalvar"){const v=num($("tpValor").value);if(v<=0){$("tpValor").focus();toast("Coloque o valor");return}
     const sel=document.querySelector('[data-act="eConta"][aria-pressed="true"]');const c=sel?sel.dataset.v:S.contas[0].id;
-    closeSheet();aplicarPagTattoo(v,c).then(()=>{commit();save();toast(`Tattoo pagou ${brl(v)}`)})}
+    closeSheet();aplicarPagTattoo(v,c).then(()=>{commit();save();toast(`Reembolso de ${brl(v)} marcado como pago`)})}
   else if(a==="novaTransf"){const f=S.contas.find(c=>c.tipo==="fisico"),vt=S.contas.find(c=>c.tipo!=="fisico");trForm={de:(f||S.contas[0]).id,para:(vt||S.contas[1]||S.contas[0]).id};$("sheet").innerHTML="";sheetTransf();setTimeout(()=>$("trValor")?.focus(),50)}
   else if(a==="trConta"){const lado=b.dataset.lado,out=lado==="de"?"para":"de";if(trForm[out]===b.dataset.v)trForm[out]=trForm[lado];trForm[lado]=b.dataset.v;sheetTransf()}
   else if(a==="addTransf"){const v=num($("trValor").value);if(v<=0){$("trValor").focus();toast("Coloque o valor");return}

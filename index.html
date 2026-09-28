@@ -208,6 +208,11 @@ nav.bn button[aria-selected="true"]::after{content:"";position:absolute;top:0;le
 .tatnote{display:flex;gap:12px;align-items:center;background:linear-gradient(135deg,#FF5C9E22,#3E7BFF22);border:1px solid #C04FD655;border-radius:16px;padding:12px 14px;margin-top:14px}
 .tatnote>span{font-size:22px}.tatnote b{display:block;font-size:15px}.tatnote small{color:var(--soft);font-size:12px}
 .edpen{font-size:12px;color:var(--soft);opacity:.7}
+.projbig{margin-top:10px;border-radius:18px;padding:16px;background:linear-gradient(135deg,#7B5CF0,#5B6CF0);color:#fff;text-align:center}
+.projbig.neg{background:linear-gradient(135deg,#E25670,#C23A5A)}
+.projbig small{display:block;font-size:13px;opacity:.85}.projbig b{display:block;font-family:var(--display);font-size:34px;margin:2px 0}.projbig span{font-size:12px;opacity:.85}
+.mnav{display:flex;justify-content:space-between;align-items:center}
+.linkbtn{background:none;border:0;padding:0;color:var(--violet);font:inherit;font-weight:700;text-decoration:underline;cursor:pointer}
 /* rings */
 .rings{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
 .ring{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:14px;text-align:center}
@@ -300,7 +305,7 @@ footer{margin-top:30px;font-size:12px;color:var(--soft);text-align:center}
 <div class="tab" id="t-metas"></div>
 <div class="tab" id="t-negocios"></div>
 
-<footer>Pra planejar e acompanhar. Não é consultoria financeira.<br><span style="opacity:.6">versão 27/09 · 2</span></footer>
+<footer>Pra planejar e acompanhar. Não é consultoria financeira.<br><span style="opacity:.6">versão 28/09 · 2</span></footer>
 </main>
 
 <nav class="bn"><div class="in" role="tablist">
@@ -408,6 +413,7 @@ const DEFAULTS={
   faturaPaga:{},    // mes -> {conta,valor,data}
   fixosPagos:{},    // "mes|nome" -> {conta,valor}
   cartao:{fecha:28,vence:13,limite:8150}, // cartão Sicredi
+  proj:{salario:4300,vale:550,diaDia:null}, // projeção: renda do mês e gasto do dia a dia (null = média automática)
   projetos:[],  // {id,data,desc,cliente,valor,pago,recebidoPor,conta}
   tatConta:"sicredi", // onde entram os pagamentos da tattoo feitos pelo Frana
   tatVisto:null,      // quanto de cada reembolso já foi visto (reembolso não mexe mais no banco)
@@ -504,6 +510,27 @@ function pendentes(k){
   if(FAT_MESES.includes(k)){const fz=faturaDe(k); if(!fz.paga&&fz.total>0) out.push({tipo:"fatura",key:k,desc:"Fatura Sicredi",valor:fz.total,e:"💳"});}
   return out;
 }
+/* ===== projeção de sobra ===== */
+function mediaDiaDia(){
+  const meses=[1,2,3].map(n=>shiftM(MES_HOJE,-n)).filter(k=>S.gastos.some(g=>(g.data||"").slice(0,7)===k));
+  if(!meses.length)return null;
+  return Math.round(sum(meses,k=>sum(gastosPessoais(k).filter(g=>g.forma!=="cartao"),g=>g.valor))/meses.length*100)/100;
+}
+function projMes(k){
+  const P=S.proj||{}, sal=+P.salario||0, vale=+P.vale||0;
+  const med=mediaDiaDia(), dd=P.diaDia!=null?+P.diaDia:(med!=null?med:vale);
+  const fz=faturaDe(k), fat=fz.paga?0:fz.total;
+  const fix=sum(S.fixos.filter(f=>f[2]!=="cartao"),f=>+f[1]||0);
+  const contas=S.aPagar.filter(a=>a.mes===k&&!a.pago&&apFalta(a)>0.004), ct=sum(contas,apFalta);
+  const mts=S.metas.filter(m=>+m.valorParcela>0&&(+m.pagas||0)<(+m.parcelas||0)), mt=sum(mts,m=>+m.valorParcela);
+  const entra=sal+vale, sai=Math.round((fat+fix+ct+mt+dd)*100)/100;
+  return {sal,vale,entra,fat,fix,ct,contas,mt,mts,dd,ddAuto:P.diaDia==null,med,sai,sobra:Math.round((entra-sai)*100)/100};
+}
+function projAcum(k){ /* saldo hoje − o que falta pagar este mês + sobras dos meses seguintes até k */
+  let v=saldoVirtual()+saldoFisico()-sum(pendentes(MES_HOJE),p=>p.valor);
+  for(let m=shiftM(MES_HOJE,1);m<=k;m=shiftM(m,1))v+=projMes(m).sobra;
+  return Math.round(v*100)/100;
+}
 const saldoVirtual=()=>sum(S.contas.filter(c=>c.tipo!=="fisico"),c=>c.saldo);
 const saldoFisico=()=>sum(S.contas.filter(c=>c.tipo==="fisico"),c=>c.saldo);
 const tatPago=r=>r.pagoValor!=null?+r.pagoValor:(r.reembolsado?+r.value:0);
@@ -574,6 +601,9 @@ function rInicio(){
     <span class="pi">⏳</span><span class="pt"><small>Pra pagar em ${mshort(curHome)}</small><b>${brl(pendT)}</b></span>
     <span class="pc">${pend.length?pend.length+(pend.length===1?" conta":" contas"):"Tudo pago 🎉"} ›</span>
   </button>
+  ${(()=>{const pk=shiftM(MES_HOJE,1),ac=projAcum(pk);return `<button class="paybtn" style="border-color:${ac<0?"#F2C4CC":"var(--violet-bg)"}" data-act="projecao">
+    <span class="pi" style="background:var(--violet-bg)">🔮</span><span class="pt"><small>Tu termina ${mshort(pk)} com</small><b style="color:${ac<0?"var(--bad)":"inherit"}">${brl(ac)}</b></span>
+    <span class="pc" style="color:var(--violet)">ver conta ›</span></button>`})()}
   <h2>Metas</h2>
   <div class="rings">${S.metas.map(m=>{const i=metaInfo(m);return `<div class="ring">${ring2(i,m.c||"#7B5CF0",92,10)}<b>${esc(m.e||"🎯")} ${esc(m.nome)}</b><div class="muted">${i.alvo?brl0(i.disp)+" de "+brl0(i.alvo):i.n?i.pg+" de "+i.n+" parcelas":brl0(i.tenho)+" guardado"}</div></div>`}).join("")}</div>`;
 }
@@ -847,6 +877,34 @@ function sheetEntrada(msg=""){
     <div><span class="muted" style="font-weight:600">Entrou em</span><div class="chips">${S.contas.map((c,i)=>`<button class="chip" style="--c:${c.cor}" aria-pressed="${i===0}" data-act="eConta" data-v="${c.id}">${esc(c.nome)}</button>`).join("")}</div></div>
     ${msg?`<div style="color:var(--bad);font-weight:600;font-size:14px">${msg}</div>`:""}
     <button class="btn full" style="font-size:16px;padding:15px" data-act="addEntrada">Salvar entrada</button></div>`);
+}
+let projK=null, projOpen=false;
+function sheetProjecao(){
+  projK=projK||shiftM(MES_HOJE,1); const p=projMes(projK), ac=projAcum(projK);
+  const ln=(l,v,cls="")=>`<div class="item" style="padding:8px 0"><div class="tx">${l}</div><span class="val num ${cls}">${v}</span></div>`;
+  openSheet(`<div style="display:flex;justify-content:space-between;align-items:center"><h3>🔮 Projeção</h3><button class="x" data-act="fechar" aria-label="Fechar">×</button></div>
+  <div class="monthnav" style="margin-top:8px"><button data-act="projM" data-d="-1" ${projK<=shiftM(MES_HOJE,1)?"disabled style='opacity:.3'":""} aria-label="Mês anterior">‹</button><b>${mfull(projK)}</b><button data-act="projM" data-d="1" aria-label="Próximo mês">›</button></div>
+  <div class="projbig ${ac<0?"neg":""}"><small>Tu termina ${mshort(projK)} com uns</small><b class="num">${brl(ac)}</b><span>contando o que tu tem hoje</span></div>
+  <div class="parcbox" style="margin-top:10px;font-size:14px;display:flex;justify-content:space-between;align-items:center;gap:10px"><span>Só no mês de ${mshort(projK)}: entra ${brl(p.entra)}, sai ${brl(p.sai)}</span><b class="num" style="white-space:nowrap;color:${p.sobra<0?"var(--bad)":"var(--mint)"}">${p.sobra<0?"−":"+"}${brl(Math.abs(p.sobra))}</b></div>
+  <div class="card" style="margin-top:10px">
+    <div class="muted" style="font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:.04em">Entra</div>
+    ${ln("💼 Salário",brl(p.sal))}${ln("🍽️ Vale (Swile)",brl(p.vale))}
+    <div class="muted" style="font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:.04em;margin-top:10px">Sai</div>
+    ${ln(`💳 Fatura Sicredi${p.fat?"":" (paga)"}`,brl(p.fat))}
+    ${ln("📌 Fixos fora do cartão",brl(p.fix))}
+    ${p.contas.map(a=>ln(`${a.credor==="pai"?"👨":"🔧"} ${esc(a.desc)}`,brl(apFalta(a)))).join("")}
+    ${p.mts.map(m=>ln(`${m.e} Parcela ${esc(m.nome)}`,brl(+m.valorParcela))).join("")}
+    ${ln(`🛒 Dia a dia <span class="muted" style="font-size:12px">(${p.ddAuto?(p.med!=null?"média dos últimos meses":"estimado pelo vale"):"valor que tu definiu"})</span>`,brl(p.dd))}
+  </div>
+  <p class="muted" style="font-size:12px;margin:8px 0 0">"Termina com" = o que tu tem hoje − o que ainda falta pagar em ${mshort(MES_HOJE)} + o que sobra (ou falta) em cada mês até ${mshort(projK)}.</p>
+  <details style="margin-top:12px" ${projOpen?"open":""}><summary style="font-weight:700;color:var(--violet)">Ajustar valores</summary>
+    <div class="stack" style="margin-top:8px">
+      <label class="f">Salário líquido<input type="text" inputmode="decimal" data-proj="salario" value="${inV(p.sal)}"></label>
+      <label class="f">Vale (Swile)<input type="text" inputmode="decimal" data-proj="vale" value="${inV(p.vale)}"></label>
+      <label class="f">Gasto do dia a dia no mês<input type="text" inputmode="decimal" data-proj="diaDia" value="${inV(p.dd)}"></label>
+      <p class="muted" style="margin:0;font-size:12px">Dia a dia = mercado, gasolina, lanches… o que tu paga no débito, Pix, vale ou dinheiro. O que vai no cartão já tá na fatura.${!p.ddAuto?` <button class="linkbtn" data-act="projAuto">Voltar pra média automática</button>`:""}</p>
+    </div></details>
+  <p class="muted" style="font-size:12px;margin-top:10px">Não conta tattoo, tarot nem projetos, porque variam. O que entrar deles é lucro em cima disso. 😉</p>`);
 }
 let trForm={};
 function sheetTransf(msg=""){
@@ -1148,6 +1206,9 @@ document.addEventListener("click",e=>{
   else if(a==="tatPagouSalvar"){const v=num($("tpValor").value);if(v<=0){$("tpValor").focus();toast("Coloque o valor");return}
     const sel=document.querySelector('[data-act="eConta"][aria-pressed="true"]');const c=sel?sel.dataset.v:S.contas[0].id;
     closeSheet();aplicarPagTattoo(v,c).then(()=>{commit();save();toast(`Reembolso de ${brl(v)} marcado como pago`)})}
+  else if(a==="projecao"){projK=null;projOpen=false;$("sheet").innerHTML="";sheetProjecao()}
+  else if(a==="projM"){projK=shiftM(projK,+b.dataset.d);if(projK<shiftM(MES_HOJE,1))projK=shiftM(MES_HOJE,1);sheetProjecao()}
+  else if(a==="projAuto"){S.proj.diaDia=null;commit();sheetProjecao()}
   else if(a==="novaTransf"){const f=S.contas.find(c=>c.tipo==="fisico"),vt=S.contas.find(c=>c.tipo!=="fisico");trForm={de:(f||S.contas[0]).id,para:(vt||S.contas[1]||S.contas[0]).id};$("sheet").innerHTML="";sheetTransf();setTimeout(()=>$("trValor")?.focus(),50)}
   else if(a==="trConta"){const lado=b.dataset.lado,out=lado==="de"?"para":"de";if(trForm[out]===b.dataset.v)trForm[out]=trForm[lado];trForm[lado]=b.dataset.v;sheetTransf()}
   else if(a==="addTransf"){const v=num($("trValor").value);if(v<=0){$("trValor").focus();toast("Coloque o valor");return}
@@ -1221,6 +1282,7 @@ function aplicaCampo(t){
   else if(d.mt!==undefined){const m=S.metas[+d.mt];m[d.f]=["nome","e"].includes(d.f)?t.value:num(t.value)}
   else if(d.fx!==undefined){const f=S.fixos[+d.fx];f[+d.c]=d.c==="1"?num(t.value):t.value}
   else if(d.ap!==undefined){const x=S.aPagar[+d.ap];x[d.f]=d.f==="valor"?num(t.value):t.value}
+  else if(d.proj){S.proj=S.proj||{};projOpen=true;S.proj[d.proj]=num(t.value);setTimeout(()=>{commit();if($("sheet").innerHTML)sheetProjecao()},0);return}
   else if(d.ct!==undefined){const c=S.cats[+d.ct],old=c.n;c[d.f]=t.value;if(d.f==="n")S.gastos.forEach(g=>{if(g.cat===old)g.cat=t.value})}
   else return;
   /* espera o foco ir pro próximo campo antes de redesenhar */

@@ -305,7 +305,7 @@ footer{margin-top:30px;font-size:12px;color:var(--soft);text-align:center}
 <div class="tab" id="t-metas"></div>
 <div class="tab" id="t-negocios"></div>
 
-<footer>Pra planejar e acompanhar. Não é consultoria financeira.<br><span style="opacity:.6">versão 28/09 · 3</span></footer>
+<footer>Pra planejar e acompanhar. Não é consultoria financeira.<br><span style="opacity:.6">versão 28/09 · 4</span></footer>
 </main>
 
 <nav class="bn"><div class="in" role="tablist">
@@ -368,8 +368,10 @@ async function sbSignOut(){ await sb.auth.signOut(); location.reload(); }
   /* sem "lembrar": a sessão acaba quando fechar o app */
   try{ if(localStorage.getItem('fin-lembrar')==='0' && !sessionStorage.getItem('fin-aberto')){ sb.auth.signOut({scope:'local'}); } sessionStorage.setItem('fin-aberto','1'); }catch(e){}
   function ready(user){
-    if(SB_USER) return;
+    if(SB_USER && !SB_USER.offline) return;
+    const eraOff = SB_USER && SB_USER.offline;
     SB_USER = user; box.style.display = 'none';
+    if(eraOff){ window.aoRelogar && window.aoRelogar(user); return; }
     sbReadyCallbacks.splice(0).forEach(fn=>fn(user));
   }
   form.addEventListener('submit', async e=>{
@@ -377,11 +379,14 @@ async function sbSignOut(){ await sb.auth.signOut(); location.reload(); }
     const { data, error } = await sb.auth.signInWithPassword({ email: document.getElementById('sbEmail').value.trim(), password: document.getElementById('sbSenha').value });
     if(error){ err.textContent = error.message.includes('Invalid') ? 'E-mail ou senha incorretos.' : 'Não deu pra entrar: ' + error.message; return; }
     try{ if(lemb.checked){ localStorage.setItem('fin-email', em.value.trim()); localStorage.setItem('fin-lembrar','1'); } else { localStorage.removeItem('fin-email'); localStorage.setItem('fin-lembrar','0'); } }catch(e){}
-    err.textContent = ''; ready(data.user);
+    err.textContent = ''; try{ localStorage.setItem('fin-uid', data.user.id); }catch(e){} ready(data.user);
   });
+  const semNet = ()=>{ try{ const u = localStorage.getItem('fin-uid'); if(u && !navigator.onLine){ ready({ id:u, offline:true }); return true; } }catch(e){} return false; };
+  window.sbMostrarLogin = ()=>{ box.style.display = 'flex'; };
   sb.auth.getSession().then(({ data })=>{
-    if(data.session) ready(data.session.user); else box.style.display = 'flex';
-  });
+    if(data.session){ try{ localStorage.setItem('fin-uid', data.session.user.id); }catch(e){} ready(data.session.user); }
+    else if(!semNet()) box.style.display = 'flex';
+  }).catch(()=>{ if(!semNet()) box.style.display = 'flex'; });
 })();
 </script>
 <!-- ===== fim do login ===== -->
@@ -843,10 +848,32 @@ function sheetInbox(){
   <p class="muted">Toque num gasto pra escolher a categoria e onde saiu.</p>
   ${INBOX.map(x=>`<div class="item"><div class="dot" style="background:var(--violet-bg)">💳</div><button class="tx" data-act="classificar" data-id="${x.id}" style="border:0;background:transparent;text-align:left;color:var(--ink);font-family:var(--body);cursor:pointer;padding:0"><div>${esc(x.lugar||"Compra")}</div><span class="muted">${new Date(x.criado_em).toLocaleString("pt-BR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"})}${x.cartao?" · "+esc(x.cartao):""}</span>${pareceFixo(x)?`<span class="pill warn" style="margin-top:4px">parece o fixo ${esc(pareceFixo(x)[0])}</span>`:""}</button><span class="val">${brl(x.valor)}</span><button class="x" data-act="ignorar" data-id="${x.id}" aria-label="Ignorar">×</button></div>`).join("")}`);
 }
+/* ===== sem internet: operações ficam guardadas no aparelho e vão quando a conexão voltar ===== */
+const OPS_KEY="fin-ops";
+const lerOps=()=>{try{return JSON.parse(localStorage.getItem(OPS_KEY)||"[]")}catch(e){return[]}};
+const gravarOps=o=>{try{localStorage.setItem(OPS_KEY,JSON.stringify(o))}catch(e){}};
+async function runOp(op){
+  let r;
+  if(op.k==="inboxDel")r=await sb.from("fin_inbox").delete().eq("id",op.id);
+  else if(op.k==="frIns")r=await sb.from("frana_docs").upsert(op.rows,{onConflict:"user_id,col,id",ignoreDuplicates:true});
+  else if(op.k==="frDel")r=await sb.from("frana_docs").delete().eq("col","reembolsos").in("id",op.ids);
+  else if(op.k==="frUpd")r=await sb.from("frana_docs").update({data:op.data}).eq("col","reembolsos").eq("id",op.id);
+  else return true;
+  if(r.error){console.error(r.error);return false}return true;
+}
+async function doOp(op){
+  if(PREVIA||!sb)return true;
+  if(navigator.onLine&&!lerOps().length){try{if(await runOp(op))return true}catch(e){}}
+  const o=lerOps();o.push(op);gravarOps(o);return false;
+}
+async function flushOps(){
+  if(PREVIA||!sb||!navigator.onLine)return;
+  let o=lerOps(); while(o.length){let ok=false;try{ok=await runOp(o[0])}catch(e){} if(!ok)break; o.shift(); gravarOps(o);}
+}
 async function tirarInbox(id){
   if(id==="ex3"){try{localStorage.setItem("fin-previa-ex3","1")}catch(e){}}
   INBOX=INBOX.filter(x=>x.id!==id);
-  if(!PREVIA&&sb){const {error}=await sb.from("fin_inbox").delete().eq("id",id);if(error)console.error(error)}
+  if(!PREVIA&&sb){await doOp({k:"inboxDel",id});guardarCache()}
   else{try{localStorage.setItem("fin-previa-inbox",JSON.stringify(INBOX))}catch(e){}}
 }
 function parcInfo(){const n=form.parcelas||1,v=num(form.valor);const ini=primeiraFatura(form.data);
@@ -981,22 +1008,22 @@ async function criarReembFrana(g){
   }
   (S.tatVisto=S.tatVisto||{}); linhas.forEach(l=>S.tatVisto[l.id]=0);
   if(PREVIA||!sb){linhas.forEach(l=>FR.reembolsos.push({id:l.id,...l.data}));try{localStorage.setItem("fin-previa-frana",JSON.stringify(FR))}catch(e){}render();return}
-  const {error}=await sb.from("frana_docs").insert(linhas.map(l=>({user_id:SB_USER.id,col:"reembolsos",id:l.id,data:l.data})));
-  if(error){console.error(error);toast("Não consegui mandar pro Frana");return}
-  toast("Mandei pro Frana como reembolso");
+  linhas.forEach(l=>FR.reembolsos.push({id:l.id,...l.data})); guardarCache();
+  const ok=await doOp({k:"frIns",rows:linhas.map(l=>({user_id:SB_USER.id,col:"reembolsos",id:l.id,data:l.data}))});
+  toast(ok?"Mandei pro Frana como reembolso":"Sem internet: vai pro Frana quando a conexão voltar");
 }
 async function apagarReembFrana(g){
   const ids=FR.reembolsos.filter(r=>r.gastoId===g.id&&!(tatPago(r)>0)).map(r=>r.id);
   FR.reembolsos=FR.reembolsos.filter(r=>!ids.includes(r.id));
   if(PREVIA||!sb){try{localStorage.setItem("fin-previa-frana",JSON.stringify(FR))}catch(e){}return}
-  if(ids.length){const {error}=await sb.from("frana_docs").delete().eq("col","reembolsos").in("id",ids);if(error)console.error(error)}
+  if(ids.length){await doOp({k:"frDel",ids});guardarCache()}
 }
 async function aplicarPagTattoo(v,contaId){
   const p=planoAbate(v);
   for(const {r,t} of p.out){
     r.pagoValor=Math.round((tatPago(r)+t)*100)/100; r.pagoDate=HOJE; r.reembolsado=r.pagoValor>=(+r.value||0)-0.004;
     (S.tatVisto=S.tatVisto||{})[r.id]=r.pagoValor;
-    if(!PREVIA&&sb){const {id,...data}=r;const {error}=await sb.from("frana_docs").update({data}).eq("col","reembolsos").eq("id",id);if(error)console.error(error)}
+    if(!PREVIA&&sb){const {id,...data}=r;await doOp({k:"frUpd",id,data})}
   }
   if(PREVIA){try{localStorage.setItem("fin-previa-frana",JSON.stringify(FR))}catch(e){}}
 }
@@ -1306,6 +1333,11 @@ function merge(o){
   (S.aPagar||[]).forEach(a=>{if(!a.credor&&/\(pai\)|\bpai\b/i.test(a.desc||""))a.credor="pai"}); S.projetos=S.projetos||[];
 }
 let save=()=>{};
+/* cópia de tudo no aparelho, pra abrir e lançar sem internet */
+const cacheKey=()=>"fin-cache-"+((typeof SB_USER!=="undefined"&&SB_USER&&SB_USER.id)||"x");
+function guardarCache(pendente){if(PREVIA)return;try{localStorage.setItem(cacheKey(),JSON.stringify({S,FR,INBOX,em:Date.now()}));if(pendente)localStorage.setItem("fin-pendente","1")}catch(e){}}
+function lerCache(){try{return JSON.parse(localStorage.getItem(cacheKey())||"null")}catch(e){return null}}
+if(!PREVIA&&"serviceWorker" in navigator&&(location.protocol==="https:"||location.hostname==="127.0.0.1"))navigator.serviceWorker.register("sw.js").catch(()=>{});
 render(); setSave("Carregando…");
 
 if(PREVIA){
@@ -1319,8 +1351,13 @@ if(PREVIA){
   ready=true; if(sincTatEntradas())save(); render(); setSave("Prévia");
 }else{
   save=async function(){saveT=null;const body=JSON.stringify(S);
-    const {error}=await sb.from("fin_plano").upsert({estado:S},{onConflict:"user_id"});
-    if(error){setSave("Erro ao salvar");console.error(error)}else{lastSaved=body;setSave("Salvo")}};
+    guardarCache(true);
+    if(!navigator.onLine){setSave("Sem internet · salvo no celular");return}
+    let error=null;try{({error}=await sb.from("fin_plano").upsert({estado:S},{onConflict:"user_id"}))}catch(e){error=e}
+    if(error){console.error(error);
+      if(!navigator.onLine||String(error.message||error).match(/fetch|network|Load failed/i)){setSave("Sem internet · salvo no celular");return}
+      setSave("Entra de novo pra sincronizar");window.sbMostrarLogin&&window.sbMostrarLogin();return}
+    lastSaved=body;try{localStorage.removeItem("fin-pendente")}catch(e){}setSave("Salvo")};
   async function loadFrana(){
     const r=await sb.from("frana_docs").select("id,col,data").in("col",["reembolsos","tattoos","events"]);
     if(r.error)return;
@@ -1328,13 +1365,25 @@ if(PREVIA){
     FR={reembolsos:pick("reembolsos"),tattoos:pick("tattoos"),events:pick("events")};
   }
   async function loadInbox(){const r=await sb.from("fin_inbox").select("*").order("criado_em");if(!r.error)INBOX=r.data||[]}
-  onSbReady(async user=>{
-    const {data,error}=await sb.from("fin_plano").select("estado").maybeSingle();
-    if(error){setSave("Erro ao carregar");console.error(error);return}
+  let conectado=false, USER=null;
+  async function sincronizar(){
+    if(conectado||!navigator.onLine)return;
+    if(USER.offline){ /* entrou sem internet: confere se a sessão ainda vale */
+      let ses=null;try{({data:{session:ses}}=await sb.auth.getSession())}catch(e){}
+      if(ses){USER=ses.user;SB_USER=ses.user}else{if(!ready)usarCache();setSave("Entra de novo pra sincronizar");window.sbMostrarLogin&&window.sbMostrarLogin();return}
+    }
+    const user=USER;
+    let data,error; try{({data,error}=await sb.from("fin_plano").select("estado").maybeSingle())}catch(e){error=e}
+    if(error){console.error(error);if(!ready)usarCache();return}
+    const pend=(()=>{try{return localStorage.getItem("fin-pendente")==="1"}catch(e){return false}})();
+    const c=lerCache();
+    if(pend&&c&&c.S){merge(c.S)} /* mexeu sem internet: o que tá no celular vale */
+    else if(!(ready&&saveT))merge(data&&data.estado);
     ready=true;
-    merge(data&&data.estado);
-    if(!data||!data.estado||data.estado.v!==2) await save(); else lastSaved=JSON.stringify(S);
-    await loadFrana(); await loadInbox(); if(sincTatEntradas())await save(); render(); setSave("Salvo");
+    if(pend||!data||!data.estado||data.estado.v!==2) await save(); else lastSaved=JSON.stringify(S);
+    await flushOps();
+    await loadFrana(); await loadInbox(); if(sincTatEntradas())await save(); guardarCache(); render(); if(!saveT)setSave(pend?"Sincronizado ✓":"Salvo");
+    conectado=true;
     sb.channel("fin-"+user.id)
       .on("postgres_changes",{event:"*",schema:"public",table:"fin_plano",filter:"user_id=eq."+user.id},p=>{
         if(p.eventType==="DELETE"||saveT)return; const b=JSON.stringify(p.new.estado);
@@ -1345,9 +1394,25 @@ if(PREVIA){
         /* pega o estado mais novo antes de lançar, pra não duplicar se o app estiver aberto em dois aparelhos */
         const f=await sb.from("fin_plano").select("estado").maybeSingle(); if(f.data&&f.data.estado&&!saveT){merge(f.data.estado)}
         if(sincTatEntradas())await save(); render()})
-      .on("postgres_changes",{event:"*",schema:"public",table:"fin_inbox",filter:"user_id=eq."+user.id},async()=>{await loadInbox();render()})
+      .on("postgres_changes",{event:"*",schema:"public",table:"fin_inbox",filter:"user_id=eq."+user.id},async()=>{await loadInbox();guardarCache();render()})
       .subscribe();
+  }
+  function usarCache(){
+    const c=lerCache(); ready=true;
+    if(c&&c.S){merge(c.S);FR=c.FR||FR;INBOX=c.INBOX||INBOX;lastSaved=""}
+    render(); setSave(c?"Sem internet · usando o que tá no celular":"Sem internet");
+  }
+  window.aoRelogar=u=>{USER=u;sincronizar()};
+  setInterval(()=>{if(USER&&!conectado&&navigator.onLine&&!USER.offline)sincronizar()},30000);
+  onSbReady(async user=>{
+    USER=user;
+    if(!navigator.onLine){usarCache();return}
+    await sincronizar();
   });
+  addEventListener("online",async()=>{if(!USER)return;setSave("Sincronizando…");
+    if(conectado){await flushOps();let p=false;try{p=localStorage.getItem("fin-pendente")==="1"}catch(e){} if(p)await save();else setSave("Salvo")}
+    else await sincronizar()});
+  addEventListener("offline",()=>setSave("Sem internet · salvo no celular"));
 }
 </script>
 </body>

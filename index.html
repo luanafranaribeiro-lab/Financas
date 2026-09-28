@@ -305,7 +305,7 @@ footer{margin-top:30px;font-size:12px;color:var(--soft);text-align:center}
 <div class="tab" id="t-metas"></div>
 <div class="tab" id="t-negocios"></div>
 
-<footer>Pra planejar e acompanhar. Não é consultoria financeira.<br><span style="opacity:.6">versão 28/09 · 2</span></footer>
+<footer>Pra planejar e acompanhar. Não é consultoria financeira.<br><span style="opacity:.6">versão 28/09 · 3</span></footer>
 </main>
 
 <nav class="bn"><div class="in" role="tablist">
@@ -602,7 +602,7 @@ function rInicio(){
     <span class="pc">${pend.length?pend.length+(pend.length===1?" conta":" contas"):"Tudo pago 🎉"} ›</span>
   </button>
   ${(()=>{const pk=shiftM(MES_HOJE,1),ac=projAcum(pk);return `<button class="paybtn" style="border-color:${ac<0?"#F2C4CC":"var(--violet-bg)"}" data-act="projecao">
-    <span class="pi" style="background:var(--violet-bg)">🔮</span><span class="pt"><small>Tu termina ${mshort(pk)} com</small><b style="color:${ac<0?"var(--bad)":"inherit"}">${brl(ac)}</b></span>
+    <span class="pi" style="background:var(--violet-bg)">📈</span><span class="pt"><small>Tu termina ${mshort(pk)} com</small><b style="color:${ac<0?"var(--bad)":"inherit"}">${brl(ac)}</b></span>
     <span class="pc" style="color:var(--violet)">ver conta ›</span></button>`})()}
   <h2>Metas</h2>
   <div class="rings">${S.metas.map(m=>{const i=metaInfo(m);return `<div class="ring">${ring2(i,m.c||"#7B5CF0",92,10)}<b>${esc(m.e||"🎯")} ${esc(m.nome)}</b><div class="muted">${i.alvo?brl0(i.disp)+" de "+brl0(i.alvo):i.n?i.pg+" de "+i.n+" parcelas":brl0(i.tenho)+" guardado"}</div></div>`}).join("")}</div>`;
@@ -882,7 +882,7 @@ let projK=null, projOpen=false;
 function sheetProjecao(){
   projK=projK||shiftM(MES_HOJE,1); const p=projMes(projK), ac=projAcum(projK);
   const ln=(l,v,cls="")=>`<div class="item" style="padding:8px 0"><div class="tx">${l}</div><span class="val num ${cls}">${v}</span></div>`;
-  openSheet(`<div style="display:flex;justify-content:space-between;align-items:center"><h3>🔮 Projeção</h3><button class="x" data-act="fechar" aria-label="Fechar">×</button></div>
+  openSheet(`<div style="display:flex;justify-content:space-between;align-items:center"><h3>📈 Projeção</h3><button class="x" data-act="fechar" aria-label="Fechar">×</button></div>
   <div class="monthnav" style="margin-top:8px"><button data-act="projM" data-d="-1" ${projK<=shiftM(MES_HOJE,1)?"disabled style='opacity:.3'":""} aria-label="Mês anterior">‹</button><b>${mfull(projK)}</b><button data-act="projM" data-d="1" aria-label="Próximo mês">›</button></div>
   <div class="projbig ${ac<0?"neg":""}"><small>Tu termina ${mshort(projK)} com uns</small><b class="num">${brl(ac)}</b><span>contando o que tu tem hoje</span></div>
   <div class="parcbox" style="margin-top:10px;font-size:14px;display:flex;justify-content:space-between;align-items:center;gap:10px"><span>Só no mês de ${mshort(projK)}: entra ${brl(p.entra)}, sai ${brl(p.sai)}</span><b class="num" style="white-space:nowrap;color:${p.sobra<0?"var(--bad)":"var(--mint)"}">${p.sobra<0?"−":"+"}${brl(Math.abs(p.sobra))}</b></div>

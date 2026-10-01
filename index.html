@@ -305,7 +305,7 @@ footer{margin-top:30px;font-size:12px;color:var(--soft);text-align:center}
 <div class="tab" id="t-metas"></div>
 <div class="tab" id="t-negocios"></div>
 
-<footer>Pra planejar e acompanhar. Não é consultoria financeira.<br><span style="opacity:.6">versão 28/09 · 4</span></footer>
+<footer>Pra planejar e acompanhar. Não é consultoria financeira.<br><span style="opacity:.6">versão 30/09 · 1</span></footer>
 </main>
 
 <nav class="bn"><div class="in" role="tablist">
@@ -418,7 +418,7 @@ const DEFAULTS={
   faturaPaga:{},    // mes -> {conta,valor,data}
   fixosPagos:{},    // "mes|nome" -> {conta,valor}
   cartao:{fecha:28,vence:13,limite:8150}, // cartão Sicredi
-  proj:{salario:4300,vale:550,diaDia:null}, // projeção: renda do mês e gasto do dia a dia (null = média automática)
+  proj:{salario:4300,vale:550,diaDia:null,diaSal:5,diaVale:15}, // projeção: renda do mês e gasto do dia a dia (null = média automática)
   projetos:[],  // {id,data,desc,cliente,valor,pago,recebidoPor,conta}
   tatConta:"sicredi", // onde entram os pagamentos da tattoo feitos pelo Frana
   tatVisto:null,      // quanto de cada reembolso já foi visto (reembolso não mexe mais no banco)
@@ -454,7 +454,7 @@ const FRANA_PREVIA={
 };
 
 let S=structuredClone(DEFAULTS), FR={reembolsos:[],tattoos:[],events:[]};
-const hoje=new Date(), HOJE=hoje.toISOString().slice(0,10), MES_HOJE=HOJE.slice(0,7);
+const hoje=new Date(), HOJE=new Date(hoje.getTime()-hoje.getTimezoneOffset()*6e4).toISOString().slice(0,10), MES_HOJE=HOJE.slice(0,7); /* data do celular (antes pegava UTC e virava o dia às 21h) */
 let curHome = MES_HOJE, curG=MES_HOJE, tab="inicio";
 let form={valor:"",desc:"",cat:"",forma:"sicredi",data:HOJE,inbox:null}, catOpen=null;
 /* gastos que chegaram pelo Atalho do iPhone (Carteira / Apple Pay) */
@@ -531,8 +531,15 @@ function projMes(k){
   const entra=sal+vale, sai=Math.round((fat+fix+ct+mt+dd)*100)/100;
   return {sal,vale,entra,fat,fix,ct,contas,mt,mts,dd,ddAuto:P.diaDia==null,med,sai,sobra:Math.round((entra-sai)*100)/100};
 }
-function projAcum(k){ /* saldo hoje − o que falta pagar este mês + sobras dos meses seguintes até k */
-  let v=saldoVirtual()+saldoFisico()-sum(pendentes(MES_HOJE),p=>p.valor);
+function restoMesAtual(){ /* o que ainda falta acontecer neste mês: salário/vale que ainda não caíram e o dia a dia dos dias que faltam */
+  const P=S.proj||{}, p=projMes(MES_HOJE), dia=+HOJE.slice(8,10);
+  const [y,m]=MES_HOJE.split("-").map(Number), dm=new Date(y,m,0).getDate();
+  const sal=dia<(+P.diaSal||5)?(+P.salario||0):0, vale=dia<(+P.diaVale||15)?(+P.vale||0):0;
+  const dd=Math.round(p.dd*Math.max(0,dm-dia)/dm*100)/100;
+  return {sal,vale,dd,total:sal+vale-dd};
+}
+function projAcum(k){ /* saldo hoje − o que falta pagar este mês + o resto deste mês + sobras dos meses seguintes até k */
+  let v=saldoVirtual()+saldoFisico()-sum(pendentes(MES_HOJE),p=>p.valor)+restoMesAtual().total;
   for(let m=shiftM(MES_HOJE,1);m<=k;m=shiftM(m,1))v+=projMes(m).sobra;
   return Math.round(v*100)/100;
 }
@@ -923,11 +930,13 @@ function sheetProjecao(){
     ${p.mts.map(m=>ln(`${m.e} Parcela ${esc(m.nome)}`,brl(+m.valorParcela))).join("")}
     ${ln(`🛒 Dia a dia <span class="muted" style="font-size:12px">(${p.ddAuto?(p.med!=null?"média dos últimos meses":"estimado pelo vale"):"valor que tu definiu"})</span>`,brl(p.dd))}
   </div>
-  <p class="muted" style="font-size:12px;margin:8px 0 0">"Termina com" = o que tu tem hoje − o que ainda falta pagar em ${mshort(MES_HOJE)} + o que sobra (ou falta) em cada mês até ${mshort(projK)}.</p>
+  ${(()=>{const r=restoMesAtual();return `<p class="muted" style="font-size:12px;margin:8px 0 0">"Termina com" = o que tu tem hoje − o que ainda falta pagar em ${mshort(MES_HOJE)}${r.sal||r.vale?` + ${r.sal&&r.vale?"salário e vale":r.sal?"salário":"vale"} que ainda vão cair em ${mshort(MES_HOJE)}`:""} − o dia a dia dos dias que faltam + o que sobra (ou falta) em cada mês até ${mshort(projK)}.</p>`})()}
   <details style="margin-top:12px" ${projOpen?"open":""}><summary style="font-weight:700;color:var(--violet)">Ajustar valores</summary>
     <div class="stack" style="margin-top:8px">
       <label class="f">Salário líquido<input type="text" inputmode="decimal" data-proj="salario" value="${inV(p.sal)}"></label>
+      <label class="f">Dia que cai o salário<input type="text" inputmode="numeric" data-proj="diaSal" value="${(S.proj&&S.proj.diaSal)||5}"></label>
       <label class="f">Vale (Swile)<input type="text" inputmode="decimal" data-proj="vale" value="${inV(p.vale)}"></label>
+      <label class="f">Dia que cai o vale<input type="text" inputmode="numeric" data-proj="diaVale" value="${(S.proj&&S.proj.diaVale)||15}"></label>
       <label class="f">Gasto do dia a dia no mês<input type="text" inputmode="decimal" data-proj="diaDia" value="${inV(p.dd)}"></label>
       <p class="muted" style="margin:0;font-size:12px">Dia a dia = mercado, gasolina, lanches… o que tu paga no débito, Pix, vale ou dinheiro. O que vai no cartão já tá na fatura.${!p.ddAuto?` <button class="linkbtn" data-act="projAuto">Voltar pra média automática</button>`:""}</p>
     </div></details>

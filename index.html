@@ -305,7 +305,7 @@ footer{margin-top:30px;font-size:12px;color:var(--soft);text-align:center}
 <div class="tab" id="t-metas"></div>
 <div class="tab" id="t-negocios"></div>
 
-<footer>Pra planejar e acompanhar. Não é consultoria financeira.<br><span style="opacity:.6">versão 30/09 · 1</span></footer>
+<footer>Pra planejar e acompanhar. Não é consultoria financeira.<br><span style="opacity:.6">versão 01/10 · 1</span></footer>
 </main>
 
 <nav class="bn"><div class="in" role="tablist">
@@ -534,7 +534,10 @@ function projMes(k){
 function restoMesAtual(){ /* o que ainda falta acontecer neste mês: salário/vale que ainda não caíram e o dia a dia dos dias que faltam */
   const P=S.proj||{}, p=projMes(MES_HOJE), dia=+HOJE.slice(8,10);
   const [y,m]=MES_HOJE.split("-").map(Number), dm=new Date(y,m,0).getDate();
-  const sal=dia<(+P.diaSal||5)?(+P.salario||0):0, vale=dia<(+P.diaVale||15)?(+P.vale||0):0;
+  /* salário/vale contam como "ainda vão cair" até aparecer uma entrada parecida lançada neste mês */
+  const caiu=(v,cId)=>v>0&&S.entradas.some(e=>(e.data||"").slice(0,7)===MES_HOJE&&!e.auto&&(cId&&e.conta===cId?Math.abs(e.valor-v)<=v*0.5:Math.abs(e.valor-v)<=v*0.2));
+  /* pendente se ainda não foi lançado e o dia dele ainda não passou (depois do dia, considera que já tá no saldo) */
+  const sal=(!caiu(+P.salario||0)&&dia<=(+P.diaSal||5))?(+P.salario||0):0, vale=(!caiu(+P.vale||0,"swile")&&dia<=(+P.diaVale||15))?(+P.vale||0):0;
   const dd=Math.round(p.dd*Math.max(0,dm-dia)/dm*100)/100;
   return {sal,vale,dd,total:sal+vale-dd};
 }
@@ -613,7 +616,7 @@ function rInicio(){
     <span class="pi">⏳</span><span class="pt"><small>Pra pagar em ${mshort(curHome)}</small><b>${brl(pendT)}</b></span>
     <span class="pc">${pend.length?pend.length+(pend.length===1?" conta":" contas"):"Tudo pago 🎉"} ›</span>
   </button>
-  ${(()=>{const pk=shiftM(MES_HOJE,1),ac=projAcum(pk);return `<button class="paybtn" style="border-color:${ac<0?"#F2C4CC":"var(--violet-bg)"}" data-act="projecao">
+  ${(()=>{const pk=MES_HOJE,ac=projAcum(pk);return `<button class="paybtn" style="border-color:${ac<0?"#F2C4CC":"var(--violet-bg)"}" data-act="projecao">
     <span class="pi" style="background:var(--violet-bg)">📈</span><span class="pt"><small>Tu termina ${mshort(pk)} com</small><b style="color:${ac<0?"var(--bad)":"inherit"}">${brl(ac)}</b></span>
     <span class="pc" style="color:var(--violet)">ver conta ›</span></button>`})()}
   <h2>Metas</h2>
@@ -914,10 +917,10 @@ function sheetEntrada(msg=""){
 }
 let projK=null, projOpen=false;
 function sheetProjecao(){
-  projK=projK||shiftM(MES_HOJE,1); const p=projMes(projK), ac=projAcum(projK);
+  projK=projK||MES_HOJE; const p=projMes(projK), ac=projAcum(projK);
   const ln=(l,v,cls="")=>`<div class="item" style="padding:8px 0"><div class="tx">${l}</div><span class="val num ${cls}">${v}</span></div>`;
   openSheet(`<div style="display:flex;justify-content:space-between;align-items:center"><h3>📈 Projeção</h3><button class="x" data-act="fechar" aria-label="Fechar">×</button></div>
-  <div class="monthnav" style="margin-top:8px"><button data-act="projM" data-d="-1" ${projK<=shiftM(MES_HOJE,1)?"disabled style='opacity:.3'":""} aria-label="Mês anterior">‹</button><b>${mfull(projK)}</b><button data-act="projM" data-d="1" aria-label="Próximo mês">›</button></div>
+  <div class="monthnav" style="margin-top:8px"><button data-act="projM" data-d="-1" ${projK<=MES_HOJE?"disabled style='opacity:.3'":""} aria-label="Mês anterior">‹</button><b>${mfull(projK)}</b><button data-act="projM" data-d="1" aria-label="Próximo mês">›</button></div>
   <div class="projbig ${ac<0?"neg":""}"><small>Tu termina ${mshort(projK)} com uns</small><b class="num">${brl(ac)}</b><span>contando o que tu tem hoje</span></div>
   <div class="parcbox" style="margin-top:10px;font-size:14px;display:flex;justify-content:space-between;align-items:center;gap:10px"><span>Só no mês de ${mshort(projK)}: entra ${brl(p.entra)}, sai ${brl(p.sai)}</span><b class="num" style="white-space:nowrap;color:${p.sobra<0?"var(--bad)":"var(--mint)"}">${p.sobra<0?"−":"+"}${brl(Math.abs(p.sobra))}</b></div>
   <div class="card" style="margin-top:10px">
@@ -930,13 +933,14 @@ function sheetProjecao(){
     ${p.mts.map(m=>ln(`${m.e} Parcela ${esc(m.nome)}`,brl(+m.valorParcela))).join("")}
     ${ln(`🛒 Dia a dia <span class="muted" style="font-size:12px">(${p.ddAuto?(p.med!=null?"média dos últimos meses":"estimado pelo vale"):"valor que tu definiu"})</span>`,brl(p.dd))}
   </div>
-  ${(()=>{const r=restoMesAtual();return `<p class="muted" style="font-size:12px;margin:8px 0 0">"Termina com" = o que tu tem hoje − o que ainda falta pagar em ${mshort(MES_HOJE)}${r.sal||r.vale?` + ${r.sal&&r.vale?"salário e vale":r.sal?"salário":"vale"} que ainda vão cair em ${mshort(MES_HOJE)}`:""} − o dia a dia dos dias que faltam + o que sobra (ou falta) em cada mês até ${mshort(projK)}.</p>`})()}
+  ${(()=>{const r=restoMesAtual();return `<p class="muted" style="font-size:12px;margin:8px 0 0">"Termina com" = o que tu tem hoje − o que ainda falta pagar em ${mshort(MES_HOJE)}${r.sal||r.vale?` + ${r.sal&&r.vale?"salário e vale":r.sal?"salário":"vale"} que ainda não ${r.sal&&r.vale?"foram lançados":"foi lançado"} em ${mshort(MES_HOJE)}`:""} − o dia a dia dos dias que faltam + o que sobra (ou falta) em cada mês até ${mshort(projK)}.</p>`})()}
   <details style="margin-top:12px" ${projOpen?"open":""}><summary style="font-weight:700;color:var(--violet)">Ajustar valores</summary>
     <div class="stack" style="margin-top:8px">
       <label class="f">Salário líquido<input type="text" inputmode="decimal" data-proj="salario" value="${inV(p.sal)}"></label>
       <label class="f">Dia que cai o salário<input type="text" inputmode="numeric" data-proj="diaSal" value="${(S.proj&&S.proj.diaSal)||5}"></label>
       <label class="f">Vale (Swile)<input type="text" inputmode="decimal" data-proj="vale" value="${inV(p.vale)}"></label>
       <label class="f">Dia que cai o vale<input type="text" inputmode="numeric" data-proj="diaVale" value="${(S.proj&&S.proj.diaVale)||15}"></label>
+
       <label class="f">Gasto do dia a dia no mês<input type="text" inputmode="decimal" data-proj="diaDia" value="${inV(p.dd)}"></label>
       <p class="muted" style="margin:0;font-size:12px">Dia a dia = mercado, gasolina, lanches… o que tu paga no débito, Pix, vale ou dinheiro. O que vai no cartão já tá na fatura.${!p.ddAuto?` <button class="linkbtn" data-act="projAuto">Voltar pra média automática</button>`:""}</p>
     </div></details>
@@ -1243,7 +1247,7 @@ document.addEventListener("click",e=>{
     const sel=document.querySelector('[data-act="eConta"][aria-pressed="true"]');const c=sel?sel.dataset.v:S.contas[0].id;
     closeSheet();aplicarPagTattoo(v,c).then(()=>{commit();save();toast(`Reembolso de ${brl(v)} marcado como pago`)})}
   else if(a==="projecao"){projK=null;projOpen=false;$("sheet").innerHTML="";sheetProjecao()}
-  else if(a==="projM"){projK=shiftM(projK,+b.dataset.d);if(projK<shiftM(MES_HOJE,1))projK=shiftM(MES_HOJE,1);sheetProjecao()}
+  else if(a==="projM"){projK=shiftM(projK,+b.dataset.d);if(projK<MES_HOJE)projK=MES_HOJE;sheetProjecao()}
   else if(a==="projAuto"){S.proj.diaDia=null;commit();sheetProjecao()}
   else if(a==="novaTransf"){const f=S.contas.find(c=>c.tipo==="fisico"),vt=S.contas.find(c=>c.tipo!=="fisico");trForm={de:(f||S.contas[0]).id,para:(vt||S.contas[1]||S.contas[0]).id};$("sheet").innerHTML="";sheetTransf();setTimeout(()=>$("trValor")?.focus(),50)}
   else if(a==="trConta"){const lado=b.dataset.lado,out=lado==="de"?"para":"de";if(trForm[out]===b.dataset.v)trForm[out]=trForm[lado];trForm[lado]=b.dataset.v;sheetTransf()}

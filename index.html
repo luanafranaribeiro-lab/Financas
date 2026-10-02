@@ -61,6 +61,7 @@ nav.bn button[aria-selected="true"]::after{content:"";position:absolute;top:0;le
 .hero .split{display:flex;gap:8px;flex-wrap:wrap;position:relative;z-index:1}
 .hero .split div{background:rgba(255,255,255,.18);border-radius:12px;padding:8px 12px;font-size:13px}
 .hero .split b{display:block;font-size:17px;font-family:var(--display)}
+.hero .split.contas{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr))}
 
 .tiles{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
 .tile{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:14px;position:relative;overflow:hidden}
@@ -305,7 +306,7 @@ footer{margin-top:30px;font-size:12px;color:var(--soft);text-align:center}
 <div class="tab" id="t-metas"></div>
 <div class="tab" id="t-negocios"></div>
 
-<footer>Pra planejar e acompanhar. Não é consultoria financeira.<br><span style="opacity:.6">versão 01/10 · 1</span></footer>
+<footer>Pra planejar e acompanhar. Não é consultoria financeira.<br><span style="opacity:.6">versão 01/10 · 2</span></footer>
 </main>
 
 <nav class="bn"><div class="in" role="tablist">
@@ -606,7 +607,7 @@ function rInicio(){
   $("t-inicio").innerHTML=`
   ${INBOX.length?`<button class="inboxbtn" data-act="inbox"><span>📲</span><span style="flex:1"><b>${INBOX.length} ${INBOX.length===1?"gasto":"gastos"} da Carteira</b><small>toque pra classificar</small></span><span class="num" style="font-weight:800">${brl(sum(INBOX,x=>x.valor))} ›</span></button>`:""}
   <div class="hero"><small>Saldo pessoal</small><div class="big">${brl(virt+fis)}</div>
-    <div class="split"><div>Virtual<b>${brl(virt)}</b></div><div>Físico<b>${brl(fis)}</b></div></div></div>
+    <div class="split contas">${S.contas.filter(c=>c.id!=="pagbank"||Math.abs(+c.saldo||0)>0.004).map(c=>`<div>${c.tipo==="fisico"?"Físico":esc(c.nome)}<b>${brl(c.saldo)}</b></div>`).join("")}</div></div>
   ${monthNav(curHome,"home")}
   <button class="paybtn" style="border-color:var(--mint-bg)" data-act="go" data-tab="gastos">
     <span class="pi" style="background:var(--mint-bg)">🧾</span><span class="pt"><small>Gastos em ${mshort(curHome)}</small><b>${brl(gTot)}</b></span>

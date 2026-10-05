@@ -65,7 +65,8 @@ nav.bn button[aria-selected="true"]::after{content:"";position:absolute;top:0;le
 .hbar i{display:block;height:100%;border-radius:99px;min-width:6px;box-shadow:inset 0 0 0 1px rgba(255,255,255,.35)}
 .hcontas{position:relative;z-index:1;display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .hc{display:grid;grid-template-columns:auto 1fr;grid-template-rows:auto auto;column-gap:8px;align-items:center;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.22);border-radius:16px;padding:10px 12px;backdrop-filter:blur(6px)}
-.hc .hd{grid-row:1;width:10px;height:10px;border-radius:50%;box-shadow:0 0 0 2px rgba(255,255,255,.75)}
+.selo{display:inline-flex;align-items:center;justify-content:center;flex:none;border-radius:50%;background:var(--c);color:#fff;font-weight:800;font-family:var(--display);letter-spacing:-.02em;box-shadow:0 0 0 2px rgba(255,255,255,.85),0 2px 6px rgba(0,0,0,.18)}
+.hc .selo{grid-row:1}
 .hc .hn{grid-row:1;font-size:13px;font-weight:600;display:flex;align-items:baseline;gap:5px;min-width:0}
 .hc .hn small{font-size:11px;font-weight:500;opacity:.7}
 .hc:last-child:nth-child(odd){grid-column:1/-1}
@@ -222,6 +223,10 @@ nav.bn button[aria-selected="true"]::after{content:"";position:absolute;top:0;le
 .projbig small{display:block;font-size:13px;opacity:.85}.projbig b{display:block;font-family:var(--display);font-size:34px;margin:2px 0}.projbig span{font-size:12px;opacity:.85}
 .mnav{display:flex;justify-content:space-between;align-items:center}
 .linkbtn{background:none;border:0;padding:0;color:var(--violet);font:inherit;font-weight:700;text-decoration:underline;cursor:pointer}
+.fattat{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0 4px}
+.fattat div{border-radius:14px;padding:10px 12px;background:var(--well)}
+.fattat div:last-child{background:linear-gradient(135deg,#FF5C9E1f,#3E7BFF1f);border:1px solid #C04FD640}
+.fattat small{display:block;font-size:12px;color:var(--soft)}.fattat b{font-family:var(--display);font-size:18px}
 /* rings */
 .rings{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
 .ring{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:14px;text-align:center}
@@ -314,7 +319,7 @@ footer{margin-top:30px;font-size:12px;color:var(--soft);text-align:center}
 <div class="tab" id="t-metas"></div>
 <div class="tab" id="t-negocios"></div>
 
-<footer>Pra planejar e acompanhar. Não é consultoria financeira.<br><span style="opacity:.6">versão 05/10 · 1</span></footer>
+<footer>Pra planejar e acompanhar. Não é consultoria financeira.<br><span style="opacity:.6">versão 05/10 · 4</span></footer>
 </main>
 
 <nav class="bn"><div class="in" role="tablist">
@@ -408,7 +413,7 @@ const DEFAULTS={
   v:2,
   contas:[
     {id:"sicredi",nome:"Sicredi",tipo:"virtual",cor:"#2E9E5B",saldo:622.26},
-    {id:"pagbank",nome:"PagBank",tipo:"virtual",cor:"#D9A011",saldo:0},
+    {id:"mercadopago",nome:"Mercado Pago",tipo:"virtual",cor:"#009EE3",saldo:0,negocio:true}, // conta da tattoo: não entra no saldo pessoal
     {id:"swile",nome:"Swile",tipo:"virtual",cor:"#F0598F",saldo:3.64},
     {id:"dinheiro",nome:"Dinheiro físico",tipo:"fisico",cor:"#2F95B8",saldo:260}
   ],
@@ -509,7 +514,8 @@ function parcelasNaFatura(k){
 function faturaDe(k){
   const parc=parcelasNaFatura(k);
   const compras=+S.fatura[k]||0, rec=sum(recorrCartao(),f=>fxV(f,k)), lanc=sum(parc,p=>p.v);
-  return {compras,rec,lanc,parc,total:Math.round((compras+rec+lanc)*100)/100,paga:S.faturaPaga[k]};
+  const tat=Math.round(sum(parc.filter(p=>ehTattoo(p.g)),p=>p.v)*100)/100; /* compras da tattoo: saem do dinheiro das tattoos, não do salário */
+  return {compras,rec,lanc,lancPes:Math.round((lanc-tat)*100)/100,tat,parc,total:Math.round((compras+rec+lanc)*100)/100,paga:S.faturaPaga[k]};
 }
 const apFalta=a=>Math.max(0,Math.round(((+a.valor||0)-(+a.pagoValor||0))*100)/100);
 const dividaPai=()=>S.aPagar.filter(a=>a.credor==="pai"&&!a.pago&&apFalta(a)>0.004).sort((x,y)=>(x.mes||"").localeCompare(y.mes||""));
@@ -535,12 +541,13 @@ function mediaDiaDia(){
 function projMes(k){
   const P=S.proj||{}, sal=+P.salario||0, vale=+P.vale||0;
   const med=mediaDiaDia(), dd=P.diaDia!=null?+P.diaDia:(med!=null?med:vale);
-  const fz=faturaDe(k), fat=fz.paga?0:fz.total;
+  const fz=faturaDe(k), fat=fz.paga?0:fz.total, fatTat=fz.paga?0:fz.tat;
   const fix=sum(S.fixos.filter(f=>f[2]!=="cartao"),f=>fxV(f,k));
   const contas=S.aPagar.filter(a=>a.mes===k&&!a.pago&&apFalta(a)>0.004), ct=sum(contas,apFalta);
   const mts=S.metas.filter(m=>+m.valorParcela>0&&(+m.pagas||0)<(+m.parcelas||0)), mt=sum(mts,m=>+m.valorParcela);
   const entra=sal+vale, sai=Math.round((fat+fix+ct+mt+dd)*100)/100;
-  return {sal,vale,entra,fat,fix,ct,contas,mt,mts,dd,ddAuto:P.diaDia==null,med,sai,sobra:Math.round((entra-sai)*100)/100};
+  const saiPes=Math.round((sai-fatTat)*100)/100;
+  return {sal,vale,entra,fat,fatTat,fix,ct,contas,mt,mts,dd,ddAuto:P.diaDia==null,med,sai,saiPes,sobra:Math.round((entra-saiPes)*100)/100,sobraPes:Math.round((entra-saiPes)*100)/100}; /* compras da tattoo ficam fora: quem paga é a tattoo */
 }
 function restoMesAtual(){ /* o que ainda falta acontecer neste mês: salário/vale que ainda não caíram e o dia a dia dos dias que faltam */
   const P=S.proj||{}, p=projMes(MES_HOJE), dia=+HOJE.slice(8,10);
@@ -553,12 +560,16 @@ function restoMesAtual(){ /* o que ainda falta acontecer neste mês: salário/va
   return {sal,vale,dd,total:sal+vale-dd};
 }
 function projAcum(k){ /* saldo hoje − o que falta pagar este mês + o resto deste mês + sobras dos meses seguintes até k */
-  let v=saldoVirtual()+saldoFisico()-sum(pendentes(MES_HOJE),p=>p.valor)+restoMesAtual().total;
+  let v=saldoVirtual()+saldoFisico()-sum(pendentes(MES_HOJE),p=>p.tipo==="fatura"?p.valor-faturaDe(p.key).tat:p.valor)+restoMesAtual().total;
   for(let m=shiftM(MES_HOJE,1);m<=k;m=shiftM(m,1))v+=projMes(m).sobra;
   return Math.round(v*100)/100;
 }
-const saldoVirtual=()=>sum(S.contas.filter(c=>c.tipo!=="fisico"),c=>c.saldo);
-const saldoFisico=()=>sum(S.contas.filter(c=>c.tipo==="fisico"),c=>c.saldo);
+const contasPessoais=()=>S.contas.filter(c=>!c.negocio);
+const saldoVirtual=()=>sum(contasPessoais().filter(c=>c.tipo!=="fisico"),c=>c.saldo);
+const saldoFisico=()=>sum(contasPessoais().filter(c=>c.tipo==="fisico"),c=>c.saldo);
+/* selinho da conta: iniciais na cor dela */
+const siglaConta=c=>c.tipo==="fisico"?"R$":(w=>w.length>1?(w[0][0]+w[1][0]).toUpperCase():w[0].slice(0,2).replace(/^./,x=>x.toUpperCase()))(String(c.nome||"?").trim().split(/\s+/));
+const selo=(c,sz=28)=>`<span class="selo" style="--c:${c.cor};width:${sz}px;height:${sz}px;font-size:${Math.round(sz*.4)}px" aria-hidden="true">${esc(siglaConta(c))}</span>`;
 const tatPago=r=>r.pagoValor!=null?+r.pagoValor:(r.reembolsado?+r.value:0);
 const tatDeve=k=>sum(FR.reembolsos.filter(r=>(r.date||"").slice(0,7)===k),r=>Math.max(0,(+r.value||0)-tatPago(r)));
 function tatSaldo(){
@@ -617,10 +628,10 @@ function rInicio(){
   $("t-inicio").innerHTML=`
   ${INBOX.length?`<button class="inboxbtn" data-act="inbox"><span>📲</span><span style="flex:1"><b>${INBOX.length} ${INBOX.length===1?"gasto":"gastos"} da Carteira</b><small>toque pra classificar</small></span><span class="num" style="font-weight:800">${brl(sum(INBOX,x=>x.valor))} ›</span></button>`:""}
   <div class="hero"><small>Saldo pessoal</small><div class="big">${brl(virt+fis)}</div>
-    ${(()=>{const cs=S.contas.filter(c=>c.id!=="pagbank"||Math.abs(+c.saldo||0)>0.004), pos=cs.filter(c=>+c.saldo>0), tp=sum(pos,c=>+c.saldo)||1;
+    ${(()=>{const cs=contasPessoais(), pos=cs.filter(c=>+c.saldo>0), tp=sum(pos,c=>+c.saldo)||1;
       const sub=c=>c.tipo==="fisico"?"na carteira":c.id==="swile"?"vale":"conta";
       return `<div class="hbar" role="img" aria-label="Divisão do saldo entre as contas">${pos.map(c=>`<i style="width:${(+c.saldo/tp*100).toFixed(2)}%;background:${c.cor}"></i>`).join("")}</div>
-      <div class="hcontas">${cs.map(c=>`<div class="hc"><span class="hd" style="background:${c.cor}"></span><span class="hn">${c.tipo==="fisico"?"Físico":esc(c.nome)}<small>${sub(c)}</small></span><b class="num">${brl(c.saldo)}</b></div>`).join("")}</div>`})()}</div>
+      <div class="hcontas">${cs.map(c=>`<div class="hc">${selo(c,26)}<span class="hn">${c.tipo==="fisico"?"Físico":esc(c.nome)}<small>${sub(c)}</small></span><b class="num">${brl(c.saldo)}</b></div>`).join("")}</div>`})()}</div>
   ${monthNav(curHome,"home")}
   <button class="paybtn" style="border-color:var(--mint-bg)" data-act="go" data-tab="gastos">
     <span class="pi" style="background:var(--mint-bg)">🧾</span><span class="pt"><small>Gastos em ${mshort(curHome)}</small><b>${brl(gTot)}</b></span>
@@ -642,7 +653,7 @@ function sheetListaPagar(){
   openSheet(`<div style="display:flex;justify-content:space-between;align-items:center"><h3>Pra pagar</h3><button class="x" data-act="fechar" aria-label="Fechar">×</button></div>
   <div class="monthnav" style="margin:10px 0 4px"><button data-act="listaMes" data-d="-1" aria-label="Mês anterior">‹</button><b>${mfull(curHome)}</b><button data-act="listaMes" data-d="1" aria-label="Próximo mês">›</button></div>
   <div style="font-family:var(--display);font-size:30px;font-weight:800;margin:6px 0 8px" class="num">${brl(pendT)}</div>
-  ${pend.length?pend.map(p=>`<div class="item"><div class="dot" style="background:var(--well)">${p.e}</div>${p.tipo==="fixo"?`<div class="tx" data-act="fxMes" data-n="${esc(p.desc)}" data-k="${curHome}" style="cursor:pointer"><div>${esc(p.desc)} <span class="edpen" aria-hidden="true">✎</span></div><span class="muted">${p.mudou?"Valor ajustado neste mês":"Fixo do mês"}</span></div>`:`<div class="tx"><div>${esc(p.desc)}</div><span class="muted">${p.tipo==="fatura"?"Cartão":"Conta a pagar"}</span></div>`}<span class="val">${brl(p.valor)}</span><button class="btn sm" data-act="pagar" data-t="${p.tipo}" data-k="${esc(p.key)}" data-v="${p.valor}">Pagar</button></div>`).join(""):`<div class="empty">Tudo pago neste mês 🎉</div>`}
+  ${pend.length?pend.map(p=>`<div class="item"><div class="dot" style="background:var(--well)">${p.e}</div>${p.tipo==="fixo"?`<div class="tx" data-act="fxMes" data-n="${esc(p.desc)}" data-k="${curHome}" style="cursor:pointer"><div>${esc(p.desc)} <span class="edpen" aria-hidden="true">✎</span></div><span class="muted">${p.mudou?"Valor ajustado neste mês":"Fixo do mês"}</span></div>`:`<div class="tx"><div>${esc(p.desc)}</div><span class="muted">${p.tipo==="fatura"?(()=>{const ft=faturaDe(p.key).tat;return ft?`Cartão · ${brl(ft)} é da tattoo`:"Cartão"})():"Conta a pagar"}</span></div>`}<span class="val">${brl(p.valor)}</span><button class="btn sm" data-act="pagar" data-t="${p.tipo}" data-k="${esc(p.key)}" data-v="${p.valor}">Pagar</button></div>`).join(""):`<div class="empty">Tudo pago neste mês 🎉</div>`}
   ${pagas.length?`<details style="margin-top:6px"><summary>Já pagas (${pagas.length} · ${brl(sum(pagas,p=>p.valor))})</summary><div style="margin-top:4px">${pagas.map(p=>`<div class="item" style="padding:9px 0;opacity:.75"><div class="dot" style="background:var(--mint-bg)">✓</div><div class="tx"><div style="font-weight:500">${esc(p.desc)}</div><span class="muted">${esc(p.como)}</span></div><span class="val">${brl(p.valor)}</span></div>`).join("")}</div></details>`:""}`);
 }
 function pagosDoMes(k){const out=[];
@@ -670,10 +681,10 @@ function rGastos(){
 function rBancos(){
   const ents=[...S.entradas].sort((a,b)=>(b.data||"").localeCompare(a.data||"")).slice(0,15);
   $("t-bancos").innerHTML=`
-  <div class="hero" style="margin-top:6px"><small>Total nas contas</small><div class="big">${brl(saldoVirtual()+saldoFisico())}</div>
+  <div class="hero" style="margin-top:6px"><small>Total nas tuas contas</small><div class="big">${brl(saldoVirtual()+saldoFisico())}</div>
     <div class="split"><div>Virtual<b>${brl(saldoVirtual())}</b></div><div>Físico<b>${brl(saldoFisico())}</b></div></div></div>
   <h2>Contas</h2>
-  <div class="banks">${S.contas.map((c,i)=>`<div class="bank" style="background:linear-gradient(145deg,${c.cor},${c.cor}cc)"><div class="n">${esc(c.nome)}</div><div class="t">${c.tipo==="fisico"?"Físico":"Virtual"}</div>
+  <div class="banks">${S.contas.map((c,i)=>`<div class="bank" style="background:linear-gradient(145deg,${c.cor},${c.cor}cc)"><div style="display:flex;align-items:center;gap:8px">${selo(c,30)}<div><div class="n">${esc(c.nome)}</div><div class="t">${c.negocio?"Da tattoo · fora do teu saldo":c.tipo==="fisico"?"Físico":"Virtual"}</div></div></div>
     <input type="text" inputmode="decimal" data-saldo="${i}" value="${inV(c.saldo)}" aria-label="Saldo ${esc(c.nome)}"></div>`).join("")}</div>
   <button class="btn full ghost" style="margin-top:4px;font-size:15px;padding:13px" data-act="novaTransf">⇄ Depositar ou transferir</button>
   <p class="muted">Toque no valor pra ajustar o saldo. Os gastos e pagamentos descontam da conta escolhida sozinhos.</p>
@@ -695,11 +706,13 @@ function rFaturas(){
       <h3 style="margin-top:8px">${mfull(k)}</h3><div class="muted">vence ${String(S.cartao.vence).padStart(2,"0")}/${k.slice(5)}</div></div>
       ${f.paga?`<button class="btn sm ghost" data-act="desfazerFat" data-k="${k}">Desfazer</button>`:f.total>0?`<button class="btn sm" data-act="pagar" data-t="fatura" data-k="${k}" data-v="${f.total}">Pagar</button>`:""}</div>
     <div class="tot" style="margin-top:6px">${brl(f.total)}</div>
-    <div class="sbar"><div style="width:${f.compras/t*100}%;background:#7B5CF0"></div><div style="width:${f.rec/t*100}%;background:#F0598F"></div><div style="width:${f.lanc/t*100}%;background:#D9A011"></div></div>
+    <div class="sbar"><div style="width:${f.compras/t*100}%;background:#7B5CF0"></div><div style="width:${f.rec/t*100}%;background:#F0598F"></div><div style="width:${f.lancPes/t*100}%;background:#D9A011"></div>${f.tat?`<div style="width:${f.tat/t*100}%;background:linear-gradient(90deg,#FF5C9E,#3E7BFF)"></div>`:""}</div>
     <div class="klist"><span><i style="background:#7B5CF0"></i>Compras e parcelas</span><span>${brl(f.compras)}</span>
       <span><i style="background:#F0598F"></i>Recorrentes</span><span>${brl(f.rec)}</span>
-      <span><i style="background:#D9A011"></i>Compras novas</span><span>${brl(f.lanc)}</span></div>
-    ${f.parc.length?`<details><summary>Ver compras novas (${f.parc.length})</summary><div style="margin-top:6px">${f.parc.map(p=>`<div class="item" style="padding:8px 0"><div class="tx"><div style="font-weight:500">${esc(p.g.desc||cat(p.g.cat).n)}</div><span class="muted">${dBR(p.g.data)}${p.n>1?` · parcela ${p.i}/${p.n}`:""}</span></div><span class="val">${brl(p.v)}</span></div>`).join("")}</div></details>`:""}
+      <span><i style="background:#D9A011"></i>Compras novas</span><span>${brl(f.lancPes)}</span>
+      ${f.tat?`<span><i style="background:linear-gradient(90deg,#FF5C9E,#3E7BFF)"></i>Da tattoo</span><span>${brl(f.tat)}</span>`:""}</div>
+    ${f.tat?`<div class="fattat"><div><small>Do teu bolso</small><b class="num">${brl(f.total-f.tat)}</b></div><div><small>🖋️ A tattoo cobre</small><b class="num">${brl(f.tat)}</b></div></div>`:""}
+    ${f.parc.length?`<details><summary>Ver compras novas (${f.parc.length})</summary><div style="margin-top:6px">${f.parc.map(p=>`<div class="item" style="padding:8px 0"><div class="tx"><div style="font-weight:500">${ehTattoo(p.g)?"🖋️ ":""}${esc(p.g.desc||cat(p.g.cat).n)}</div><span class="muted">${dBR(p.g.data)}${p.n>1?` · parcela ${p.i}/${p.n}`:""}</span></div><span class="val">${brl(p.v)}</span></div>`).join("")}</div></details>`:""}
     <details><summary>Ver recorrentes</summary><div style="margin-top:6px">${recorrCartao().map(x=>`<div class="item" style="padding:7px 0"><div class="tx" data-act="fxMes" data-n="${esc(x[0])}" data-k="${k}" style="cursor:pointer"><div style="font-weight:500">${esc(x[0])} <span class="edpen" aria-hidden="true">✎</span></div>${(S.fixoMes||{})[k+"|"+x[0]]!=null?`<span class="muted">ajustado neste mês</span>`:""}</div><span class="val">${brl(fxV(x,k))}</span></div>`).join("")}<p class="muted" style="font-size:12px;margin:6px 0 0">Toque num recorrente pra mudar o valor dele nesta fatura.</p></div></details>
     <details><summary>Editar compras deste mês</summary>
       <label class="f" style="margin-top:8px">Compras e parcelas já na fatura (sem recorrentes)<input type="text" inputmode="decimal" data-fat="${k}" value="${inV(S.fatura[k])}"></label></details>
@@ -935,19 +948,20 @@ function sheetProjecao(){
   const ln=(l,v,cls="")=>`<div class="item" style="padding:8px 0"><div class="tx">${l}</div><span class="val num ${cls}">${v}</span></div>`;
   openSheet(`<div style="display:flex;justify-content:space-between;align-items:center"><h3>📈 Projeção</h3><button class="x" data-act="fechar" aria-label="Fechar">×</button></div>
   <div class="monthnav" style="margin-top:8px"><button data-act="projM" data-d="-1" ${projK<=MES_HOJE?"disabled style='opacity:.3'":""} aria-label="Mês anterior">‹</button><b>${mfull(projK)}</b><button data-act="projM" data-d="1" aria-label="Próximo mês">›</button></div>
-  <div class="projbig ${ac<0?"neg":""}"><small>Tu termina ${mshort(projK)} com uns</small><b class="num">${brl(ac)}</b><span>contando o que tu tem hoje</span></div>
-  <div class="parcbox" style="margin-top:10px;font-size:14px;display:flex;justify-content:space-between;align-items:center;gap:10px"><span>Só no mês de ${mshort(projK)}: entra ${brl(p.entra)}, sai ${brl(p.sai)}</span><b class="num" style="white-space:nowrap;color:${p.sobra<0?"var(--bad)":"var(--mint)"}">${p.sobra<0?"−":"+"}${brl(Math.abs(p.sobra))}</b></div>
+  <div class="projbig ${ac<0?"neg":""}"><small>Tu termina ${mshort(projK)} com uns</small><b class="num">${brl(ac)}</b><span>só o que é teu · compras da tattoo ficam com a tattoo</span></div>
+  <div class="parcbox" style="margin-top:10px;font-size:14px;display:flex;justify-content:space-between;align-items:center;gap:10px"><span>Só no mês de ${mshort(projK)}: entra ${brl(p.entra)}, sai ${brl(p.saiPes)}</span><b class="num" style="white-space:nowrap;color:${p.sobraPes<0?"var(--bad)":"var(--mint)"}">${p.sobraPes<0?"−":"+"}${brl(Math.abs(p.sobraPes))}</b></div>
   <div class="card" style="margin-top:10px">
     <div class="muted" style="font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:.04em">Entra</div>
     ${ln("💼 Salário",brl(p.sal))}${ln("🍽️ Vale (Swile)",brl(p.vale))}
     <div class="muted" style="font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:.04em;margin-top:10px">Sai</div>
-    ${ln(`💳 Fatura Sicredi${p.fat?"":" (paga)"}`,brl(p.fat))}
+    ${ln(`💳 Fatura Sicredi${p.fat?(p.fatTat?" (tua parte)":""):" (paga)"}`,brl(p.fat-p.fatTat))}
+    ${p.fatTat?`<div class="item" style="padding:8px 0;opacity:.6"><div class="tx">🖋️ Parte da tattoo na fatura <span class="muted" style="font-size:12px">(não conta: a tattoo paga)</span></div><span class="val num" style="text-decoration:line-through">${brl(p.fatTat)}</span></div>`:""}
     ${ln("📌 Fixos fora do cartão",brl(p.fix))}
     ${p.contas.map(a=>ln(`${a.credor==="pai"?"👨":"🔧"} ${esc(a.desc)}`,brl(apFalta(a)))).join("")}
     ${p.mts.map(m=>ln(`${m.e} Parcela ${esc(m.nome)}`,brl(+m.valorParcela))).join("")}
     ${ln(`🛒 Dia a dia <span class="muted" style="font-size:12px">(${p.ddAuto?(p.med!=null?"média dos últimos meses":"estimado pelo vale"):"valor que tu definiu"})</span>`,brl(p.dd))}
   </div>
-  ${(()=>{const r=restoMesAtual();return `<p class="muted" style="font-size:12px;margin:8px 0 0">"Termina com" = o que tu tem hoje − o que ainda falta pagar em ${mshort(MES_HOJE)}${r.sal||r.vale?` + ${r.sal&&r.vale?"salário e vale":r.sal?"salário":"vale"} que ainda não ${r.sal&&r.vale?"foram lançados":"foi lançado"} em ${mshort(MES_HOJE)}`:""} − o dia a dia dos dias que faltam + o que sobra (ou falta) em cada mês até ${mshort(projK)}.</p>`})()}
+  ${(()=>{const r=restoMesAtual();return `<p class="muted" style="font-size:12px;margin:8px 0 0">"Termina com" = o que tu tem hoje − o que ainda falta pagar em ${mshort(MES_HOJE)} (sem a parte da tattoo)${r.sal||r.vale?` + ${r.sal&&r.vale?"salário e vale":r.sal?"salário":"vale"} que ainda não ${r.sal&&r.vale?"foram lançados":"foi lançado"} em ${mshort(MES_HOJE)}`:""} − o dia a dia dos dias que faltam + o que sobra (ou falta) em cada mês até ${mshort(projK)}.</p>`})()}
   <details style="margin-top:12px" ${projOpen?"open":""}><summary style="font-weight:700;color:var(--violet)">Ajustar valores</summary>
     <div class="stack" style="margin-top:8px">
       <label class="f">Salário líquido<input type="text" inputmode="decimal" data-proj="salario" value="${inV(p.sal)}"></label>
@@ -984,7 +998,7 @@ function sheetTransf(msg=""){
     <div><span class="muted" style="font-weight:600">Saiu de</span><div class="chips">${chips("de")}</div></div>
     <div><span class="muted" style="font-weight:600">Foi para</span><div class="chips">${chips("para")}</div></div>
     <label class="f">Data<input id="trData" type="date" value="${dt}"></label>
-    <label class="f">Descrição (opcional)<input id="trDesc" placeholder="Ex.: depósito no caixa, Pix pro PagBank" value="${esc(d)}"></label>
+    <label class="f">Descrição (opcional)<input id="trDesc" placeholder="Ex.: depósito no caixa, Pix pro Mercado Pago" value="${esc(d)}"></label>
     <p class="muted" style="margin:0">Não conta como gasto nem como entrada: o dinheiro só muda de lugar.</p>
     ${msg?`<div style="color:var(--bad);font-weight:600;font-size:14px">${msg}</div>`:""}
     <button class="btn full" style="font-size:16px;padding:15px" data-act="addTransf">Salvar</button></div>`);
@@ -1383,6 +1397,12 @@ function merge(o){
   }
   S=Object.assign(structuredClone(DEFAULTS),o); S.cartao=Object.assign({fecha:28,vence:13,limite:8150},S.cartao||{});
   (S.aPagar||[]).forEach(a=>{if(!a.credor&&/\(pai\)|\bpai\b/i.test(a.desc||""))a.credor="pai"}); S.projetos=S.projetos||[];
+  /* PagBank virou Mercado Pago (conta da tattoo) */
+  if(S.contas.some(c=>c.id==="pagbank")){
+    if(!S.contas.some(c=>c.id==="mercadopago")) S=JSON.parse(JSON.stringify(S).replace(/"pagbank"/g,'"mercadopago"'));
+    else S.contas=S.contas.filter(c=>c.id!=="pagbank");
+    const mp=S.contas.find(c=>c.id==="mercadopago"); Object.assign(mp,{nome:"Mercado Pago",cor:"#009EE3",negocio:true});
+  }
 }
 let save=()=>{};
 /* cópia de tudo no aparelho, pra abrir e lançar sem internet */

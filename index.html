@@ -61,7 +61,15 @@ nav.bn button[aria-selected="true"]::after{content:"";position:absolute;top:0;le
 .hero .split{display:flex;gap:8px;flex-wrap:wrap;position:relative;z-index:1}
 .hero .split div{background:rgba(255,255,255,.18);border-radius:12px;padding:8px 12px;font-size:13px}
 .hero .split b{display:block;font-size:17px;font-family:var(--display)}
-.hero .split.contas{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr))}
+.hbar{position:relative;z-index:1;display:flex;gap:3px;height:8px;border-radius:99px;overflow:hidden;background:rgba(255,255,255,.18);margin:2px 0 14px}
+.hbar i{display:block;height:100%;border-radius:99px;min-width:6px;box-shadow:inset 0 0 0 1px rgba(255,255,255,.35)}
+.hcontas{position:relative;z-index:1;display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.hc{display:grid;grid-template-columns:auto 1fr;grid-template-rows:auto auto;column-gap:8px;align-items:center;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.22);border-radius:16px;padding:10px 12px;backdrop-filter:blur(6px)}
+.hc .hd{grid-row:1;width:10px;height:10px;border-radius:50%;box-shadow:0 0 0 2px rgba(255,255,255,.75)}
+.hc .hn{grid-row:1;font-size:13px;font-weight:600;display:flex;align-items:baseline;gap:5px;min-width:0}
+.hc .hn small{font-size:11px;font-weight:500;opacity:.7}
+.hc:last-child:nth-child(odd){grid-column:1/-1}
+.hc b{grid-column:1/3;grid-row:2;font-family:var(--display);font-size:18px;font-weight:800;margin-top:3px;white-space:nowrap}
 
 .tiles{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
 .tile{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:14px;position:relative;overflow:hidden}
@@ -306,7 +314,7 @@ footer{margin-top:30px;font-size:12px;color:var(--soft);text-align:center}
 <div class="tab" id="t-metas"></div>
 <div class="tab" id="t-negocios"></div>
 
-<footer>Pra planejar e acompanhar. Não é consultoria financeira.<br><span style="opacity:.6">versão 01/10 · 2</span></footer>
+<footer>Pra planejar e acompanhar. Não é consultoria financeira.<br><span style="opacity:.6">versão 05/10 · 1</span></footer>
 </main>
 
 <nav class="bn"><div class="in" role="tablist">
@@ -418,6 +426,7 @@ const DEFAULTS={
   fatura:{"2026-10":2866.25,"2026-11":779.88,"2026-12":279.79,"2027-01":279.79,"2027-02":279.79,"2027-03":279.79},
   faturaPaga:{},    // mes -> {conta,valor,data}
   fixosPagos:{},    // "mes|nome" -> {conta,valor}
+  fixoMes:{},       // "mes|nome" -> valor diferente só naquele mês
   cartao:{fecha:28,vence:13,limite:8150}, // cartão Sicredi
   proj:{salario:4300,vale:550,diaDia:null,diaSal:5,diaVale:15}, // projeção: renda do mês e gasto do dia a dia (null = média automática)
   projetos:[],  // {id,data,desc,cliente,valor,pago,recebidoPor,conta}
@@ -485,6 +494,7 @@ const formaCor=f=>f==="cartao"?"#7B5CF0":(conta(f)?.cor||"#8C82A8");
 
 /* ================= CÁLCULOS ================= */
 const recorrCartao=()=>S.fixos.filter(f=>f[2]==="cartao");
+const fxV=(f,k)=>{const o=(S.fixoMes||{})[k+"|"+f[0]];return o!=null?+o:(+f[1]||0)}; /* valor do fixo naquele mês */
 const gastosMes=k=>S.gastos.filter(g=>(g.data||"").slice(0,7)===k);
 /* fatura = mês do vencimento. Compra até o dia do fechamento cai na fatura do mês seguinte; depois dele, na de 2 meses depois */
 function primeiraFatura(data){const [y,m,d]=(data||HOJE).split("-").map(Number);const fecha=+(S.cartao&&S.cartao.fecha)||28;return shiftM(y+"-"+String(m).padStart(2,"0"),d<=fecha?1:2)}
@@ -498,7 +508,7 @@ function parcelasNaFatura(k){
 }
 function faturaDe(k){
   const parc=parcelasNaFatura(k);
-  const compras=+S.fatura[k]||0, rec=sum(recorrCartao(),f=>f[1]), lanc=sum(parc,p=>p.v);
+  const compras=+S.fatura[k]||0, rec=sum(recorrCartao(),f=>fxV(f,k)), lanc=sum(parc,p=>p.v);
   return {compras,rec,lanc,parc,total:Math.round((compras+rec+lanc)*100)/100,paga:S.faturaPaga[k]};
 }
 const apFalta=a=>Math.max(0,Math.round(((+a.valor||0)-(+a.pagoValor||0))*100)/100);
@@ -511,7 +521,7 @@ function planoPai(v){let rest=v;const out=[];for(const a of dividaPai()){if(rest
 function pendentes(k){
   const out=[];
   if(k<FAT_MESES[0])return out; /* o controle de contas começa em outubro/26 */
-  S.fixos.filter(f=>f[2]!=="cartao").forEach(f=>{ if(!S.fixosPagos[k+"|"+f[0]]) out.push({tipo:"fixo",key:k+"|"+f[0],desc:f[0],valor:+f[1]||0,e:"📌"}); });
+  S.fixos.filter(f=>f[2]!=="cartao").forEach(f=>{ if(!S.fixosPagos[k+"|"+f[0]]) out.push({tipo:"fixo",key:k+"|"+f[0],desc:f[0],valor:fxV(f,k),e:"📌",mudou:(S.fixoMes||{})[k+"|"+f[0]]!=null}); });
   S.aPagar.filter(a=>a.mes===k&&!a.pago&&apFalta(a)>0.004).forEach(a=>out.push({tipo:"conta",key:a.id,desc:a.desc+(+a.pagoValor>0?` (falta ${brl(apFalta(a))})`:""),valor:apFalta(a),e:a.credor==="pai"?"👨":"🔧"}));
   if(FAT_MESES.includes(k)){const fz=faturaDe(k); if(!fz.paga&&fz.total>0) out.push({tipo:"fatura",key:k,desc:"Fatura Sicredi",valor:fz.total,e:"💳"});}
   return out;
@@ -526,7 +536,7 @@ function projMes(k){
   const P=S.proj||{}, sal=+P.salario||0, vale=+P.vale||0;
   const med=mediaDiaDia(), dd=P.diaDia!=null?+P.diaDia:(med!=null?med:vale);
   const fz=faturaDe(k), fat=fz.paga?0:fz.total;
-  const fix=sum(S.fixos.filter(f=>f[2]!=="cartao"),f=>+f[1]||0);
+  const fix=sum(S.fixos.filter(f=>f[2]!=="cartao"),f=>fxV(f,k));
   const contas=S.aPagar.filter(a=>a.mes===k&&!a.pago&&apFalta(a)>0.004), ct=sum(contas,apFalta);
   const mts=S.metas.filter(m=>+m.valorParcela>0&&(+m.pagas||0)<(+m.parcelas||0)), mt=sum(mts,m=>+m.valorParcela);
   const entra=sal+vale, sai=Math.round((fat+fix+ct+mt+dd)*100)/100;
@@ -607,7 +617,10 @@ function rInicio(){
   $("t-inicio").innerHTML=`
   ${INBOX.length?`<button class="inboxbtn" data-act="inbox"><span>📲</span><span style="flex:1"><b>${INBOX.length} ${INBOX.length===1?"gasto":"gastos"} da Carteira</b><small>toque pra classificar</small></span><span class="num" style="font-weight:800">${brl(sum(INBOX,x=>x.valor))} ›</span></button>`:""}
   <div class="hero"><small>Saldo pessoal</small><div class="big">${brl(virt+fis)}</div>
-    <div class="split contas">${S.contas.filter(c=>c.id!=="pagbank"||Math.abs(+c.saldo||0)>0.004).map(c=>`<div>${c.tipo==="fisico"?"Físico":esc(c.nome)}<b>${brl(c.saldo)}</b></div>`).join("")}</div></div>
+    ${(()=>{const cs=S.contas.filter(c=>c.id!=="pagbank"||Math.abs(+c.saldo||0)>0.004), pos=cs.filter(c=>+c.saldo>0), tp=sum(pos,c=>+c.saldo)||1;
+      const sub=c=>c.tipo==="fisico"?"na carteira":c.id==="swile"?"vale":"conta";
+      return `<div class="hbar" role="img" aria-label="Divisão do saldo entre as contas">${pos.map(c=>`<i style="width:${(+c.saldo/tp*100).toFixed(2)}%;background:${c.cor}"></i>`).join("")}</div>
+      <div class="hcontas">${cs.map(c=>`<div class="hc"><span class="hd" style="background:${c.cor}"></span><span class="hn">${c.tipo==="fisico"?"Físico":esc(c.nome)}<small>${sub(c)}</small></span><b class="num">${brl(c.saldo)}</b></div>`).join("")}</div>`})()}</div>
   ${monthNav(curHome,"home")}
   <button class="paybtn" style="border-color:var(--mint-bg)" data-act="go" data-tab="gastos">
     <span class="pi" style="background:var(--mint-bg)">🧾</span><span class="pt"><small>Gastos em ${mshort(curHome)}</small><b>${brl(gTot)}</b></span>
@@ -629,7 +642,7 @@ function sheetListaPagar(){
   openSheet(`<div style="display:flex;justify-content:space-between;align-items:center"><h3>Pra pagar</h3><button class="x" data-act="fechar" aria-label="Fechar">×</button></div>
   <div class="monthnav" style="margin:10px 0 4px"><button data-act="listaMes" data-d="-1" aria-label="Mês anterior">‹</button><b>${mfull(curHome)}</b><button data-act="listaMes" data-d="1" aria-label="Próximo mês">›</button></div>
   <div style="font-family:var(--display);font-size:30px;font-weight:800;margin:6px 0 8px" class="num">${brl(pendT)}</div>
-  ${pend.length?pend.map(p=>`<div class="item"><div class="dot" style="background:var(--well)">${p.e}</div><div class="tx"><div>${esc(p.desc)}</div><span class="muted">${p.tipo==="fixo"?"Fixo do mês":p.tipo==="fatura"?"Cartão":"Conta a pagar"}</span></div><span class="val">${brl(p.valor)}</span><button class="btn sm" data-act="pagar" data-t="${p.tipo}" data-k="${esc(p.key)}" data-v="${p.valor}">Pagar</button></div>`).join(""):`<div class="empty">Tudo pago neste mês 🎉</div>`}
+  ${pend.length?pend.map(p=>`<div class="item"><div class="dot" style="background:var(--well)">${p.e}</div>${p.tipo==="fixo"?`<div class="tx" data-act="fxMes" data-n="${esc(p.desc)}" data-k="${curHome}" style="cursor:pointer"><div>${esc(p.desc)} <span class="edpen" aria-hidden="true">✎</span></div><span class="muted">${p.mudou?"Valor ajustado neste mês":"Fixo do mês"}</span></div>`:`<div class="tx"><div>${esc(p.desc)}</div><span class="muted">${p.tipo==="fatura"?"Cartão":"Conta a pagar"}</span></div>`}<span class="val">${brl(p.valor)}</span><button class="btn sm" data-act="pagar" data-t="${p.tipo}" data-k="${esc(p.key)}" data-v="${p.valor}">Pagar</button></div>`).join(""):`<div class="empty">Tudo pago neste mês 🎉</div>`}
   ${pagas.length?`<details style="margin-top:6px"><summary>Já pagas (${pagas.length} · ${brl(sum(pagas,p=>p.valor))})</summary><div style="margin-top:4px">${pagas.map(p=>`<div class="item" style="padding:9px 0;opacity:.75"><div class="dot" style="background:var(--mint-bg)">✓</div><div class="tx"><div style="font-weight:500">${esc(p.desc)}</div><span class="muted">${esc(p.como)}</span></div><span class="val">${brl(p.valor)}</span></div>`).join("")}</div></details>`:""}`);
 }
 function pagosDoMes(k){const out=[];
@@ -687,7 +700,7 @@ function rFaturas(){
       <span><i style="background:#F0598F"></i>Recorrentes</span><span>${brl(f.rec)}</span>
       <span><i style="background:#D9A011"></i>Compras novas</span><span>${brl(f.lanc)}</span></div>
     ${f.parc.length?`<details><summary>Ver compras novas (${f.parc.length})</summary><div style="margin-top:6px">${f.parc.map(p=>`<div class="item" style="padding:8px 0"><div class="tx"><div style="font-weight:500">${esc(p.g.desc||cat(p.g.cat).n)}</div><span class="muted">${dBR(p.g.data)}${p.n>1?` · parcela ${p.i}/${p.n}`:""}</span></div><span class="val">${brl(p.v)}</span></div>`).join("")}</div></details>`:""}
-    <details><summary>Ver recorrentes</summary><div style="margin-top:6px">${recorrCartao().map(x=>`<div class="item" style="padding:7px 0"><div class="tx"><div style="font-weight:500">${esc(x[0])}</div></div><span class="val">${brl(x[1])}</span></div>`).join("")}</div></details>
+    <details><summary>Ver recorrentes</summary><div style="margin-top:6px">${recorrCartao().map(x=>`<div class="item" style="padding:7px 0"><div class="tx" data-act="fxMes" data-n="${esc(x[0])}" data-k="${k}" style="cursor:pointer"><div style="font-weight:500">${esc(x[0])} <span class="edpen" aria-hidden="true">✎</span></div>${(S.fixoMes||{})[k+"|"+x[0]]!=null?`<span class="muted">ajustado neste mês</span>`:""}</div><span class="val">${brl(fxV(x,k))}</span></div>`).join("")}<p class="muted" style="font-size:12px;margin:6px 0 0">Toque num recorrente pra mudar o valor dele nesta fatura.</p></div></details>
     <details><summary>Editar compras deste mês</summary>
       <label class="f" style="margin-top:8px">Compras e parcelas já na fatura (sem recorrentes)<input type="text" inputmode="decimal" data-fat="${k}" value="${inV(S.fatura[k])}"></label></details>
     </div></div>`};
@@ -947,6 +960,20 @@ function sheetProjecao(){
     </div></details>
   <p class="muted" style="font-size:12px;margin-top:10px">Não conta tattoo, tarot nem projetos, porque variam. O que entrar deles é lucro em cima disso. 😉</p>`);
 }
+let fxCtx=null;
+function sheetFixoMes(nome,k){
+  const f=S.fixos.find(x=>x[0]===nome); if(!f)return; fxCtx={nome,k,volta:fxCtx&&fxCtx.volta};
+  const o=(S.fixoMes||{})[k+"|"+nome];
+  openSheet(`<div style="display:flex;justify-content:space-between;align-items:center"><h3>📌 ${esc(nome)}</h3><button class="x" data-act="fechar" aria-label="Fechar">×</button></div>
+  <p class="muted" style="margin:4px 0 0">${f[2]==="cartao"?"Recorrente no cartão":"Fixo do bolso"} · valor normal ${brl(f[1])}</p>
+  <div class="stack" style="margin-top:10px">
+    <label class="f">Valor em ${mfull(k)}<input class="bigval" id="fxmValor" type="text" inputmode="decimal" value="${inV(fxV(f,k))}"></label>
+    <button class="btn full" style="font-size:16px;padding:14px" data-act="fxMesSalvar" data-modo="mes">Só em ${mshort(k)}</button>
+    <button class="btn full ghost" style="font-size:15px;padding:13px" data-act="fxMesSalvar" data-modo="diante">Daqui pra frente (muda o valor normal)</button>
+    ${o!=null?`<button class="linkbtn" style="align-self:center" data-act="fxMesSalvar" data-modo="normal">Voltar pro valor normal em ${mshort(k)}</button>`:""}
+  </div>`);
+}
+function fecharFixoMes(){const volta=fxCtx&&fxCtx.volta;fxCtx=null;commit();if(volta==="lista")sheetListaPagar();else closeSheet()}
 let trForm={};
 function sheetTransf(msg=""){
   const v=$("trValor")?.value||"", d=$("trDesc")?.value||"", dt=$("trData")?.value||HOJE;
@@ -1077,7 +1104,7 @@ function sheetEmpPai(){
     <button class="btn full" style="font-size:16px;padding:15px" data-act="addEmpPai">Salvar empréstimo</button></div>`);
 }
 const lerEmp=()=>{if($("epValor"))pForm.emp={...pForm.emp,valor:$("epValor").value,desc:$("epDesc").value,mes:$("epMes").value}};
-function toast(t){let el=$("toast");if(!el){el=document.createElement("div");el.id="toast";el.style.cssText="position:fixed;left:50%;bottom:calc(84px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--paper);padding:12px 18px;border-radius:14px;font-weight:600;font-size:14px;z-index:60;box-shadow:0 8px 24px rgba(0,0,0,.2);transition:opacity .3s";document.body.appendChild(el)}
+function toast(t){let el=$("toast");if(!el){el=document.createElement("div");el.id="toast";el.style.cssText="pointer-events:none;position:fixed;left:50%;bottom:calc(84px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--paper);padding:12px 18px;border-radius:14px;font-weight:600;font-size:14px;z-index:60;box-shadow:0 8px 24px rgba(0,0,0,.2);transition:opacity .3s";document.body.appendChild(el)}
   el.textContent=t;el.style.opacity="1";clearTimeout(el._t);el._t=setTimeout(()=>el.style.opacity="0",2200)}
 function openSheet(html){$("sheet").innerHTML=html;$("sheetBg").classList.add("on")}
 function closeSheet(){$("sheetBg").classList.remove("on")}
@@ -1250,6 +1277,17 @@ document.addEventListener("click",e=>{
   else if(a==="projecao"){projK=null;projOpen=false;$("sheet").innerHTML="";sheetProjecao()}
   else if(a==="projM"){projK=shiftM(projK,+b.dataset.d);if(projK<MES_HOJE)projK=MES_HOJE;sheetProjecao()}
   else if(a==="projAuto"){S.proj.diaDia=null;commit();sheetProjecao()}
+  else if(a==="fxMes"){fxCtx={volta:$("sheet").innerHTML&&document.querySelector("#sheet [data-act=listaMes]")?"lista":null};sheetFixoMes(b.dataset.n,b.dataset.k)}
+  else if(a==="fxMesSalvar"){const {nome,k}=fxCtx,f=S.fixos.find(x=>x[0]===nome);if(!f)return;S.fixoMes=S.fixoMes||{};const key=k+"|"+nome,modo=b.dataset.modo;
+    if(modo==="normal"){delete S.fixoMes[key];toast(`${nome}: valor normal em ${mshort(k)}`);fecharFixoMes();return}
+    const v=num($("fxmValor").value);if(v<0){toast("Valor inválido");return}
+    if(modo==="mes"){if(Math.abs(v-(+f[1]||0))<0.005)delete S.fixoMes[key];else S.fixoMes[key]=v;toast(`${nome}: ${brl(v)} só em ${mshort(k)}`)}
+    else{ /* guarda o valor antigo nos meses anteriores, troca o normal e limpa ajustes daqui pra frente */
+      const velho=+f[1]||0;
+      for(const m of new Set([...Object.keys(S.fatura||{}),...FAT_MESES,...S.gastos.map(g=>(g.data||"").slice(0,7))]))if(m&&m<k&&S.fixoMes[m+"|"+nome]==null&&!S.fixosPagos[m+"|"+nome])S.fixoMes[m+"|"+nome]=velho;
+      f[1]=v;Object.keys(S.fixoMes).forEach(x=>{const [m,n]=x.split("|");if(n===nome&&m>=k)delete S.fixoMes[x]});
+      toast(`${nome}: ${brl(v)} a partir de ${mshort(k)}`)}
+    fecharFixoMes()}
   else if(a==="novaTransf"){const f=S.contas.find(c=>c.tipo==="fisico"),vt=S.contas.find(c=>c.tipo!=="fisico");trForm={de:(f||S.contas[0]).id,para:(vt||S.contas[1]||S.contas[0]).id};$("sheet").innerHTML="";sheetTransf();setTimeout(()=>$("trValor")?.focus(),50)}
   else if(a==="trConta"){const lado=b.dataset.lado,out=lado==="de"?"para":"de";if(trForm[out]===b.dataset.v)trForm[out]=trForm[lado];trForm[lado]=b.dataset.v;sheetTransf()}
   else if(a==="addTransf"){const v=num($("trValor").value);if(v<=0){$("trValor").focus();toast("Coloque o valor");return}

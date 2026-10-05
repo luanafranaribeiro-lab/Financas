@@ -319,7 +319,7 @@ footer{margin-top:30px;font-size:12px;color:var(--soft);text-align:center}
 <div class="tab" id="t-metas"></div>
 <div class="tab" id="t-negocios"></div>
 
-<footer>Pra planejar e acompanhar. Não é consultoria financeira.<br><span style="opacity:.6">versão 05/10 · 5</span></footer>
+<footer>Pra planejar e acompanhar. Não é consultoria financeira.<br><span style="opacity:.6">versão 05/10 · 6</span></footer>
 </main>
 
 <nav class="bn"><div class="in" role="tablist">
@@ -573,7 +573,7 @@ const saldoVirtual=()=>sum(contasPessoais().filter(c=>c.tipo!=="fisico"),c=>c.sa
 const saldoFisico=()=>sum(contasPessoais().filter(c=>c.tipo==="fisico"),c=>c.saldo);
 /* selinho da conta: iniciais na cor dela */
 const siglaConta=c=>c.tipo==="fisico"?"R$":(w=>w.length>1?(w[0][0]+w[1][0]).toUpperCase():w[0].slice(0,2).replace(/^./,x=>x.toUpperCase()))(String(c.nome||"?").trim().split(/\s+/));
-const selo=(c,sz=28)=>`<span class="selo" style="--c:${c.cor};width:${sz}px;height:${sz}px;font-size:${Math.round(sz*.4)}px" aria-hidden="true">${esc(siglaConta(c))}</span>`;
+const selo=(c,sz=14)=>`<span class="selo" style="--c:${c.cor};width:${sz}px;height:${sz}px" aria-hidden="true"></span>`;
 const tatPago=r=>r.pagoValor!=null?+r.pagoValor:(r.reembolsado?+r.value:0);
 const tatDeve=k=>sum(FR.reembolsos.filter(r=>(r.date||"").slice(0,7)===k),r=>Math.max(0,(+r.value||0)-tatPago(r)));
 function tatSaldo(){
@@ -635,7 +635,7 @@ function rInicio(){
     ${(()=>{const cs=contasPessoais(), pos=cs.filter(c=>+c.saldo>0), tp=sum(pos,c=>+c.saldo)||1;
       const sub=c=>c.tipo==="fisico"?"na carteira":c.id==="swile"?"vale":"conta";
       return `<div class="hbar" role="img" aria-label="Divisão do saldo entre as contas">${pos.map(c=>`<i style="width:${(+c.saldo/tp*100).toFixed(2)}%;background:${c.cor}"></i>`).join("")}</div>
-      <div class="hcontas">${cs.map(c=>`<div class="hc">${selo(c,26)}<span class="hn">${c.tipo==="fisico"?"Físico":esc(c.nome)}<small>${sub(c)}</small></span><b class="num">${brl(c.saldo)}</b></div>`).join("")}</div>`})()}</div>
+      <div class="hcontas">${cs.map(c=>`<div class="hc">${selo(c,12)}<span class="hn">${c.tipo==="fisico"?"Físico":esc(c.nome)}<small>${sub(c)}</small></span><b class="num">${brl(c.saldo)}</b></div>`).join("")}</div>`})()}</div>
   ${monthNav(curHome,"home")}
   <button class="paybtn" style="border-color:var(--mint-bg)" data-act="go" data-tab="gastos">
     <span class="pi" style="background:var(--mint-bg)">🧾</span><span class="pt"><small>Gastos em ${mshort(curHome)}</small><b>${brl(gTot)}</b></span>
@@ -645,7 +645,7 @@ function rInicio(){
     <span class="pi">⏳</span><span class="pt"><small>Pra pagar em ${mshort(curHome)}</small><b>${brl(pendT)}</b></span>
     <span class="pc">${pend.length?pend.length+(pend.length===1?" conta":" contas"):"Tudo pago 🎉"} ›</span>
   </button>
-  ${(()=>{const pk=MES_HOJE,ac=projAcum(pk);return `<button class="paybtn" style="border-color:${ac<0?"#F2C4CC":"var(--violet-bg)"}" data-act="projecao">
+  ${(()=>{const pk=curHome>MES_HOJE?curHome:MES_HOJE,ac=projAcum(pk);return `<button class="paybtn" style="border-color:${ac<0?"#F2C4CC":"var(--violet-bg)"}" data-act="projecao">
     <span class="pi" style="background:var(--violet-bg)">📈</span><span class="pt"><small>Tu termina ${mshort(pk)} com</small><b style="color:${ac<0?"var(--bad)":"inherit"}">${brl(ac)}</b></span>
     <span class="pc" style="color:var(--violet)">ver conta ›</span></button>`})()}
   <h2>Metas</h2>
@@ -688,7 +688,7 @@ function rBancos(){
   <div class="hero" style="margin-top:6px"><small>Total nas tuas contas</small><div class="big">${brl(saldoVirtual()+saldoFisico())}</div>
     <div class="split"><div>Virtual<b>${brl(saldoVirtual())}</b></div><div>Físico<b>${brl(saldoFisico())}</b></div></div></div>
   <h2>Contas</h2>
-  <div class="banks">${S.contas.map((c,i)=>`<div class="bank" style="background:linear-gradient(145deg,${c.cor},${c.cor}cc)"><div style="display:flex;align-items:center;gap:8px">${selo(c,30)}<div><div class="n">${esc(c.nome)}</div><div class="t">${c.negocio?"Da tattoo · fora do teu saldo":c.tipo==="fisico"?"Físico":"Virtual"}</div></div></div>
+  <div class="banks">${S.contas.map((c,i)=>`<div class="bank" style="background:linear-gradient(145deg,${c.cor},${c.cor}cc)"><div style="display:flex;align-items:center;gap:8px">${selo(c,14)}<div><div class="n">${esc(c.nome)}</div><div class="t">${c.negocio?"Da tattoo · fora do teu saldo":c.tipo==="fisico"?"Físico":"Virtual"}</div></div></div>
     <input type="text" inputmode="decimal" data-saldo="${i}" value="${inV(c.saldo)}" aria-label="Saldo ${esc(c.nome)}"></div>`).join("")}</div>
   <button class="btn full ghost" style="margin-top:4px;font-size:15px;padding:13px" data-act="novaTransf">⇄ Depositar ou transferir</button>
   <p class="muted">Toque no valor pra ajustar o saldo. Os gastos e pagamentos descontam da conta escolhida sozinhos.</p>
@@ -1291,7 +1291,7 @@ document.addEventListener("click",e=>{
   else if(a==="tatPagouSalvar"){const v=num($("tpValor").value);if(v<=0){$("tpValor").focus();toast("Coloque o valor");return}
     const sel=document.querySelector('[data-act="eConta"][aria-pressed="true"]');const c=sel?sel.dataset.v:S.contas[0].id;
     closeSheet();aplicarPagTattoo(v,c).then(()=>{commit();save();toast(`Reembolso de ${brl(v)} marcado como pago`)})}
-  else if(a==="projecao"){projK=null;projOpen=false;$("sheet").innerHTML="";sheetProjecao()}
+  else if(a==="projecao"){projK=curHome>MES_HOJE?curHome:null;projOpen=false;$("sheet").innerHTML="";sheetProjecao()}
   else if(a==="projM"){projK=shiftM(projK,+b.dataset.d);if(projK<MES_HOJE)projK=MES_HOJE;sheetProjecao()}
   else if(a==="projAuto"){S.proj.diaDia=null;commit();sheetProjecao()}
   else if(a==="fxMes"){fxCtx={volta:$("sheet").innerHTML&&document.querySelector("#sheet [data-act=listaMes]")?"lista":null};sheetFixoMes(b.dataset.n,b.dataset.k)}

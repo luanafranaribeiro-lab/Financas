@@ -324,7 +324,7 @@ footer{margin-top:30px;font-size:12px;color:var(--soft);text-align:center}
 <div class="tab" id="t-metas"></div>
 <div class="tab" id="t-negocios"></div>
 
-<footer>Pra planejar e acompanhar. Não é consultoria financeira.<br><span style="opacity:.6">versão 06/10 · 2</span></footer>
+<footer>Pra planejar e acompanhar. Não é consultoria financeira.<br><span style="opacity:.6">versão 06/10 · 3</span></footer>
 </main>
 
 <nav class="bn"><div class="in" role="tablist">
@@ -576,6 +576,8 @@ function restoMesAtual(){ /* o que ainda falta acontecer neste mês: salário/va
 }
 /* quanto a tattoo ainda te deve com vencimento no mês k (no mês atual, inclui o que ficou atrasado) */
 function tatDevolve(k){return Math.round(sum(FR.reembolsos.filter(r=>{const m=(r.date||"").slice(0,7);return k===MES_HOJE?m<=k:m===k}),r=>Math.max(0,(+r.value||0)-tatPago(r)))*100)/100}
+/* o que a tattoo ainda deve de meses anteriores ao k */
+function tatAtrasado(k){return Math.round(sum(FR.reembolsos.filter(r=>(r.date||"").slice(0,7)<k),r=>Math.max(0,(+r.value||0)-tatPago(r)))*100)/100}
 function projAcum(k){ /* saldo hoje − o que falta pagar este mês + o resto deste mês + sobras dos meses seguintes até k */
   let v=saldoVirtual()+saldoFisico()-sum(pendentes(MES_HOJE),p=>p.valor)+restoMesAtual().total+tatDevolve(MES_HOJE);
   for(let m=shiftM(MES_HOJE,1);m<=k;m=shiftM(m,1))v+=projMes(m).sobra;
@@ -724,7 +726,7 @@ function rFaturas(){
       <h3 style="margin-top:8px">${mfull(k)}</h3><div class="muted">vence ${String(S.cartao.vence).padStart(2,"0")}/${k.slice(5)}</div></div>
       ${S.faturaPaga[k]?`<button class="btn sm ghost" data-act="desfazerFat" data-k="${k}">Desfazer</button>`:!f.paga&&f.falta>0?`<button class="btn sm" data-act="pagar" data-t="fatura" data-k="${k}" data-v="${f.falta}">${f.pagoParc?"Pagar resto":"Pagar"}</button>`:""}</div>
     <div class="tot" style="margin-top:6px">${brl(f.total)}</div>
-    ${f.tat?`<div class="bolso"><span>💜 Do teu bolso</span><b class="num">${brl(f.total-f.tat)}</b><small>sem os ${brl(f.tat)} da tattoo</small></div>`:""}
+    ${(()=>{const at=f.paga?0:tatAtrasado(k), tt=f.tat+at; if(!tt)return ""; return `<div class="bolso"><span>💜 Do teu bolso</span><b class="num">${brl(Math.max(0,f.total-tt))}</b><small>sem ${f.tat?`os ${brl(f.tat)} da tattoo deste mês`:""}${f.tat&&at?" e ":""}${at?`${brl(at)} que a tattoo ainda te deve de antes`:""}</small></div>`})()}
     ${f.pagos.length?`<div class="pagparc"><div class="pph"><span>Já pago ${brl(f.pagoParc)}</span><b>${f.falta>0.004?`falta ${brl(f.falta)}`:"quitada ✓"}</b></div>
       ${f.pagos.map(p=>`<div class="ppi"><span>${dBR(p.data)} · ${esc(conta(p.conta)?.nome||"")}</span><span class="num">${brl(p.valor)}</span><button class="del" data-act="desfazerParc" data-k="${k}" data-id="${p.id}" aria-label="Desfazer pagamento">×</button></div>`).join("")}</div>`:""}
     <div class="sbar"><div style="width:${f.comprasPes/t*100}%;background:#7B5CF0"></div><div style="width:${f.rec/t*100}%;background:#F0598F"></div><div style="width:${f.lancPes/t*100}%;background:#D9A011"></div>${f.tat?`<div style="width:${f.tat/t*100}%;background:linear-gradient(90deg,#FF5C9E,#3E7BFF)"></div>`:""}</div>
@@ -1150,7 +1152,7 @@ function sheetPagar(t,k,v){
   openSheet((f?`<h3>Pagar fatura de ${mshort(k)}</h3>
   <p class="muted" style="margin:4px 0 0">${f.pagoParc?`Já pagou ${brl(f.pagoParc)} · falta ${brl(f.falta)}`:`Total ${brl(f.falta)}`}</p>
   <label class="f" style="margin-top:10px">Quanto tu vai pagar agora<input class="bigval" id="payValor" type="text" inputmode="decimal" value="${inV(f.falta)}"></label>
-  <div class="chips" style="margin-top:6px"><button class="chip" data-act="payQuick" data-v="${f.falta}">Tudo · ${brl(f.falta)}</button>${f.tat&&f.falta-f.tat>0.004&&!f.pagoParc?`<button class="chip" style="--c:#7B5CF0" data-act="payQuick" data-v="${Math.round((f.falta-f.tat)*100)/100}">💜 Só o meu · ${brl(f.falta-f.tat)}</button>`:""}</div>
+  <div class="chips" style="margin-top:6px"><button class="chip" data-act="payQuick" data-v="${f.falta}">Tudo · ${brl(f.falta)}</button>${(()=>{const tt=f.tat+tatAtrasado(k), meu=Math.round((f.total-tt-f.pagoParc)*100)/100; return tt&&meu>0.004&&meu<f.falta-0.004?`<button class="chip" style="--c:#7B5CF0" data-act="payQuick" data-v="${meu}">💜 Só o meu · ${brl(meu)}</button>`:""})()}</div>
   <p class="muted" style="margin:10px 0 0">De qual conta sai?</p><div class="stack" style="margin-top:8px">`:`<h3>Pagar ${brl(v)}</h3><p class="muted">De qual conta sai?</p><div class="stack" style="margin-top:12px">`)+`
   ${S.contas.map(c=>`<button class="btn full" style="background:${c.cor};text-align:left;display:flex;justify-content:space-between" data-act="pagarCom" data-c="${c.id}"><span>${esc(c.nome)}</span><span>${brl(c.saldo)}</span></button>`).join("")}
   <button class="btn full ghost" data-act="fechar">Cancelar</button></div>`);

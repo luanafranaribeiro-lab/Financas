@@ -324,7 +324,7 @@ footer{margin-top:30px;font-size:12px;color:var(--soft);text-align:center}
 <div class="tab" id="t-metas"></div>
 <div class="tab" id="t-negocios"></div>
 
-<footer>Pra planejar e acompanhar. Não é consultoria financeira.<br><span style="opacity:.6">versão 06/10 · 3</span></footer>
+<footer>Pra planejar e acompanhar. Não é consultoria financeira.<br><span style="opacity:.6">versão 06/10 · 4</span></footer>
 </main>
 
 <nav class="bn"><div class="in" role="tablist">
@@ -672,7 +672,7 @@ function sheetListaPagar(){
   openSheet(`<div style="display:flex;justify-content:space-between;align-items:center"><h3>Pra pagar</h3><button class="x" data-act="fechar" aria-label="Fechar">×</button></div>
   <div class="monthnav" style="margin:10px 0 4px"><button data-act="listaMes" data-d="-1" aria-label="Mês anterior">‹</button><b>${mfull(curHome)}</b><button data-act="listaMes" data-d="1" aria-label="Próximo mês">›</button></div>
   <div style="font-family:var(--display);font-size:30px;font-weight:800;margin:6px 0 8px" class="num">${brl(pendT)}</div>
-  ${pend.length?pend.map(p=>`<div class="item"><div class="dot" style="background:var(--well)">${p.e}</div>${p.tipo==="fixo"?`<div class="tx" data-act="fxMes" data-n="${esc(p.desc)}" data-k="${curHome}" style="cursor:pointer"><div>${esc(p.desc)} <span class="edpen" aria-hidden="true">✎</span></div><span class="muted">${p.mudou?"Valor ajustado neste mês":"Fixo do mês"}</span></div>`:`<div class="tx"><div>${esc(p.desc)}</div><span class="muted">${p.tipo==="fatura"?(()=>{const fz=faturaDe(p.key),ft=fz.tat;return fz.pagoParc?`Já pago ${brl(fz.pagoParc)}${ft&&fz.falta<=ft+0.004?" · o resto é da tattoo":""}`:ft?`Do teu bolso: <b>${brl(p.valor-ft)}</b> · ${brl(ft)} é da tattoo`:"Cartão"})():"Conta a pagar"}</span></div>`}<span class="val">${brl(p.valor)}</span><button class="btn sm" data-act="pagar" data-t="${p.tipo}" data-k="${esc(p.key)}" data-v="${p.valor}">Pagar</button></div>`).join(""):`<div class="empty">Tudo pago neste mês 🎉</div>`}
+  ${pend.length?pend.map(p=>`<div class="item"><div class="dot" style="background:var(--well)">${p.e}</div>${p.tipo==="fixo"?`<div class="tx" data-act="fxMes" data-n="${esc(p.desc)}" data-k="${curHome}" style="cursor:pointer"><div>${esc(p.desc)} <span class="edpen" aria-hidden="true">✎</span></div><span class="muted">${p.mudou?"Valor ajustado neste mês":"Fixo do mês"}</span></div>`:`<div class="tx"><div>${esc(p.desc)}</div><span class="muted">${p.tipo==="fatura"?(()=>{const fz=faturaDe(p.key),ft=Math.round((fz.tat+tatAtrasado(p.key))*100)/100;return fz.pagoParc?`Já pago ${brl(fz.pagoParc)}${ft&&fz.falta<=ft+0.004?" · o resto é da tattoo":""}`:ft?`Do teu bolso: <b>${brl(Math.max(0,p.valor-ft))}</b> · ${brl(ft)} é da tattoo`:"Cartão"})():"Conta a pagar"}</span></div>`}<span class="val">${brl(p.valor)}</span><button class="btn sm" data-act="pagar" data-t="${p.tipo}" data-k="${esc(p.key)}" data-v="${p.valor}">Pagar</button></div>`).join(""):`<div class="empty">Tudo pago neste mês 🎉</div>`}
   ${pagas.length?`<details style="margin-top:6px"><summary>Já pagas (${pagas.length} · ${brl(sum(pagas,p=>p.valor))})</summary><div style="margin-top:4px">${pagas.map(p=>`<div class="item" style="padding:9px 0;opacity:.75"><div class="dot" style="background:var(--mint-bg)">✓</div><div class="tx"><div style="font-weight:500">${esc(p.desc)}</div><span class="muted">${esc(p.como)}</span></div><span class="val">${brl(p.valor)}</span></div>`).join("")}</div></details>`:""}`);
 }
 function pagosDoMes(k){const out=[];

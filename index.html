@@ -4,6 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Minhas finanças</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Finanças">
+<meta name="theme-color" content="#7B5CF0">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -233,7 +238,7 @@ nav.bn button[aria-selected="true"]::after{content:"";position:absolute;top:0;le
 .pagparc .pph{display:flex;justify-content:space-between;gap:8px;font-size:13px;font-weight:700;white-space:nowrap}.pagparc .pph b{color:var(--mint)}
 .pagparc .ppi{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--soft);margin-top:4px}.pagparc .ppi span:first-child{flex:1}
 /* rings */
-.rings{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.rings{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
 .ring{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:14px;text-align:center}
 .ring svg{width:92px;height:92px}
 .ring b{display:block;font-family:var(--display);font-size:15px;margin-top:6px}
@@ -298,7 +303,7 @@ details summary{cursor:pointer;color:var(--violet);font-weight:600;font-size:14p
 @media (min-width:600px){.sheet-bg{align-items:center}.sheet{border-radius:24px}}
 .li{display:grid;grid-template-columns:1fr 100px 36px;gap:8px;margin-bottom:8px}
 .li.f3{grid-template-columns:1fr 90px 100px 36px}
-.li input,.li select{padding:8px 2px;border:0;border-bottom:1.5px solid var(--line);border-radius:0;background:transparent;color:var(--ink);font:500 15px var(--body);width:100%;min-width:0}
+.li input,.li select{padding:8px 2px;border:0;border-bottom:1.5px solid var(--line);border-radius:0;background:transparent;color:var(--ink);font:500 16px var(--body);width:100%;min-width:0} /* 16px: o iPhone não dá zoom ao tocar */
 .add{border:1.5px dashed var(--line);background:transparent;color:var(--ink);border-radius:12px;padding:10px;width:100%;font:600 14px var(--body);cursor:pointer}
 footer{margin-top:30px;font-size:12px;color:var(--soft);text-align:center}
 @media (max-width:420px){
@@ -307,6 +312,27 @@ footer{margin-top:30px;font-size:12px;color:var(--soft);text-align:center}
   .facts{grid-template-columns:1fr 1fr}
   .li.f3{grid-template-columns:1fr 90px 36px}.li.f3 select{grid-column:1/3;grid-row:2}
 }
+/* ===== iPad ===== */
+@media (min-width:700px){
+  .fslide{flex-basis:calc(50% - 5px)}
+  .banks{grid-template-columns:repeat(4,1fr)}
+  .hcontas{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+  .hc:last-child:nth-child(odd){grid-column:auto}
+  .negs{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:stretch}
+  .negs>*{margin:0!important}.negs .tatbig{grid-column:1/-1}
+  .sheet{max-width:560px}
+}
+@media (min-width:1000px){
+  main,nav.bn .in{max-width:1000px}
+  .homegrid{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:16px;align-items:start}
+  .homegrid .hb>.monthnav{margin-top:0}
+  .homegrid .ha .hero{min-height:100%}
+  .fslide{flex-basis:calc(33.333% - 7px)}
+  #fab{right:max(18px,calc((100vw - 1000px)/2 - 76px))!important}
+}
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+button,a,[data-act]{-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+@media (max-width:380px){#fab{width:52px!important;height:52px!important}}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head>
@@ -324,7 +350,7 @@ footer{margin-top:30px;font-size:12px;color:var(--soft);text-align:center}
 <div class="tab" id="t-metas"></div>
 <div class="tab" id="t-negocios"></div>
 
-<footer>Pra planejar e acompanhar. Não é consultoria financeira.<br><span style="opacity:.6">versão 06/10 · 5</span></footer>
+<footer>Pra planejar e acompanhar. Não é consultoria financeira.<br><span style="opacity:.6">versão 06/10 · 7</span></footer>
 </main>
 
 <nav class="bn"><div class="in" role="tablist">
@@ -579,7 +605,9 @@ function restoMesAtual(){ /* o que ainda falta acontecer neste mês: salário/va
 /* quanto a tattoo ainda te deve com vencimento no mês k (no mês atual, inclui o que ficou atrasado) */
 function tatDevolve(k){return Math.round(sum(FR.reembolsos.filter(r=>{const m=(r.date||"").slice(0,7);return k===MES_HOJE?m<=k:m===k}),r=>Math.max(0,(+r.value||0)-tatPago(r)))*100)/100}
 /* o que a tattoo ainda deve de meses anteriores ao k */
-function tatAtrasado(k){return Math.round(sum(FR.reembolsos.filter(r=>(r.date||"").slice(0,7)<k),r=>Math.max(0,(+r.value||0)-tatPago(r)))*100)/100}
+function primeiraAberta(){let k=fatAtual();for(let i=0;i<24&&faturaDe(k).paga;i++)k=shiftM(k,1);return k}
+function tatAtrasado(k){if(k!==primeiraAberta())return 0; /* a dívida antiga só abate da próxima fatura em aberto */
+  return Math.round(sum(FR.reembolsos.filter(r=>(r.date||"").slice(0,7)<k),r=>Math.max(0,(+r.value||0)-tatPago(r)))*100)/100}
 function projAcum(k){ /* saldo hoje − o que falta pagar este mês + o resto deste mês + sobras dos meses seguintes até k */
   let v=saldoVirtual()+saldoFisico()-sum(pendentes(MES_HOJE),p=>p.valor)+restoMesAtual().total+tatDevolve(MES_HOJE);
   for(let m=shiftM(MES_HOJE,1);m<=k;m=shiftM(m,1))v+=projMes(m).sobra;
@@ -643,16 +671,17 @@ function ring(pct,color,size=92,th=10,label=""){
 const monthNav=(k,id)=>`<div class="monthnav"><button data-act="mes" data-w="${id}" data-d="-1" aria-label="Mês anterior">‹</button><b>${mfull(k)}</b><button data-act="mes" data-w="${id}" data-d="1" aria-label="Próximo mês">›</button></div>`;
 
 /* ================= TELAS ================= */
+const heroContas=()=>(()=>{const cs=contasPessoais(), pos=cs.filter(c=>+c.saldo>0), tp=sum(pos,c=>+c.saldo)||1;
+      const sub=c=>c.tipo==="fisico"?"na carteira":c.id==="swile"?"vale":"conta";
+      return `<div class="hbar" role="img" aria-label="Divisão do saldo entre as contas">${pos.map(c=>`<i style="width:${(+c.saldo/tp*100).toFixed(2)}%;background:${c.cor}"></i>`).join("")}</div>
+      <div class="hcontas">${cs.map(c=>`<div class="hc">${selo(c,12)}<span class="hn">${c.tipo==="fisico"?"Físico":esc(c.nome)}<small>${sub(c)}</small></span><b class="num">${brl(c.saldo)}</b></div>`).join("")}</div>`})();
 function rInicio(){
   const virt=saldoVirtual(), fis=saldoFisico(), pend=pendentes(curHome), pendT=sum(pend,p=>p.valor);
   const gTot=sum(gastosPessoais(curHome),g=>g.valor), tarT=sum(S.tarot,t=>t.valor), ts=tatSaldo(), deve=tatDeve(curHome);
   $("t-inicio").innerHTML=`
   ${INBOX.length?`<button class="inboxbtn" data-act="inbox"><span>📲</span><span style="flex:1"><b>${INBOX.length} ${INBOX.length===1?"gasto":"gastos"} da Carteira</b><small>toque pra classificar</small></span><span class="num" style="font-weight:800">${brl(sum(INBOX,x=>x.valor))} ›</span></button>`:""}
-  <div class="hero"><small>Saldo pessoal</small><div class="big">${brl(virt+fis)}</div>
-    ${(()=>{const cs=contasPessoais(), pos=cs.filter(c=>+c.saldo>0), tp=sum(pos,c=>+c.saldo)||1;
-      const sub=c=>c.tipo==="fisico"?"na carteira":c.id==="swile"?"vale":"conta";
-      return `<div class="hbar" role="img" aria-label="Divisão do saldo entre as contas">${pos.map(c=>`<i style="width:${(+c.saldo/tp*100).toFixed(2)}%;background:${c.cor}"></i>`).join("")}</div>
-      <div class="hcontas">${cs.map(c=>`<div class="hc">${selo(c,12)}<span class="hn">${c.tipo==="fisico"?"Físico":esc(c.nome)}<small>${sub(c)}</small></span><b class="num">${brl(c.saldo)}</b></div>`).join("")}</div>`})()}</div>
+  <div class="homegrid"><div class="ha"><div class="hero"><small>Saldo pessoal</small><div class="big">${brl(virt+fis)}</div>
+    ${heroContas()}</div></div><div class="hb">
   ${monthNav(curHome,"home")}
   <button class="paybtn" style="border-color:var(--mint-bg)" data-act="go" data-tab="gastos">
     <span class="pi" style="background:var(--mint-bg)">🧾</span><span class="pt"><small>Gastos em ${mshort(curHome)}</small><b>${brl(gTot)}</b></span>
@@ -665,6 +694,7 @@ function rInicio(){
   ${(()=>{const pk=curHome>MES_HOJE?curHome:MES_HOJE,ac=projAcum(pk);return `<button class="paybtn" style="border-color:${ac<0?"#F2C4CC":"var(--violet-bg)"}" data-act="projecao">
     <span class="pi" style="background:var(--violet-bg)">📈</span><span class="pt"><small>Tu termina ${mshort(pk)} com</small><b style="color:${ac<0?"var(--bad)":"inherit"}">${brl(ac)}</b></span>
     <span class="pc" style="color:var(--violet)">ver conta ›</span></button>`})()}
+  </div></div>
   <h2>Metas</h2>
   <div class="rings">${S.metas.map(m=>{const i=metaInfo(m);return `<div class="ring">${ring2(i,m.c||"#7B5CF0",92,10)}<b>${esc(m.e||"🎯")} ${esc(m.nome)}</b><div class="muted">${i.alvo?brl0(i.disp)+" de "+brl0(i.alvo):i.n?i.pg+" de "+i.n+" parcelas":brl0(i.tenho)+" guardado"}</div></div>`}).join("")}</div>`;
 }
@@ -704,7 +734,7 @@ function rBancos(){
   const ents=[...S.entradas].sort((a,b)=>(b.data||"").localeCompare(a.data||"")).slice(0,15);
   $("t-bancos").innerHTML=`
   <div class="hero" style="margin-top:6px"><small>Total nas tuas contas</small><div class="big">${brl(saldoVirtual()+saldoFisico())}</div>
-    <div class="split"><div>Virtual<b>${brl(saldoVirtual())}</b></div><div>Físico<b>${brl(saldoFisico())}</b></div></div></div>
+    ${heroContas()}</div>
   <h2>Contas</h2>
   <div class="banks">${S.contas.map((c,i)=>`<div class="bank" style="background:linear-gradient(145deg,${c.cor},${c.cor}cc)"><div style="display:flex;align-items:center;gap:8px">${selo(c,14)}<div><div class="n">${esc(c.nome)}</div><div class="t">${c.negocio?"Da tattoo · fora do teu saldo":c.tipo==="fisico"?"Físico":"Virtual"}</div></div></div>
     <input type="text" inputmode="decimal" data-saldo="${i}" value="${inV(c.saldo)}" aria-label="Saldo ${esc(c.nome)}"></div>`).join("")}</div>
@@ -852,7 +882,7 @@ function rNegocios(){
       <p class="muted" style="margin:8px 0 0;font-size:12px">Quando um projeto é pago pro teu pai, abate daqui começando pelo mês mais antigo.</p></div>`;
   } else {
     el.innerHTML=`<p class="muted" style="margin:8px 0 12px">Toque num empreendimento pra ver os detalhes.</p>
-    <button class="tatbig" data-act="abrirNeg" data-v="tattoo">
+    <div class="negs"><button class="tatbig" data-act="abrirNeg" data-v="tattoo">
       <svg class="orn" viewBox="0 0 200 200" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round">
         <circle cx="120" cy="80" r="52"/><circle cx="120" cy="80" r="40" stroke-dasharray="2 5"/>
         <path d="M120 28v-14M120 146v14M68 80H54M172 80h14M83 43l-10-10M157 117l10 10M157 43l10-10M83 117l-10 10"/>
@@ -876,7 +906,7 @@ function rNegocios(){
       <div class="tl"><span>📐 Projetos</span><span>›</span></div>
       <div class="tv">${brl(pr.recebido)}</div><small class="lbl">recebido</small>
       <div class="tin"><div><small>A receber</small><b>${brl(pr.aReceber)}</b></div><div><small>Devo pro pai</small><b>${brl(sum(dividaPai(),apFalta))}</b></div></div>
-    </button>`;
+    </button></div>`;
   }
 }
 function render(){

@@ -227,6 +227,11 @@ nav.bn button[aria-selected="true"]::after{content:"";position:absolute;top:0;le
 .fattat div{border-radius:14px;padding:10px 12px;background:var(--well)}
 .fattat div:last-child{background:linear-gradient(135deg,#FF5C9E1f,#3E7BFF1f);border:1px solid #C04FD640}
 .fattat small{display:block;font-size:12px;color:var(--soft)}.fattat b{font-family:var(--display);font-size:18px}
+.bolso{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px;margin-top:8px;padding:10px 12px;border-radius:14px;background:linear-gradient(135deg,#7B5CF01f,#3E7BFF1a);border:1px solid #7B5CF040}
+.bolso span{font-size:13px;font-weight:700;color:var(--violet)}.bolso b{font-family:var(--display);font-size:22px;font-weight:800}.bolso small{flex-basis:100%;font-size:12px;color:var(--soft)}
+.pagparc{margin-top:8px;padding:10px 12px;border-radius:14px;background:var(--mint-bg)}
+.pagparc .pph{display:flex;justify-content:space-between;gap:8px;font-size:13px;font-weight:700;white-space:nowrap}.pagparc .pph b{color:var(--mint)}
+.pagparc .ppi{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--soft);margin-top:4px}.pagparc .ppi span:first-child{flex:1}
 /* rings */
 .rings{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
 .ring{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:14px;text-align:center}
@@ -319,7 +324,7 @@ footer{margin-top:30px;font-size:12px;color:var(--soft);text-align:center}
 <div class="tab" id="t-metas"></div>
 <div class="tab" id="t-negocios"></div>
 
-<footer>Pra planejar e acompanhar. Não é consultoria financeira.<br><span style="opacity:.6">versão 05/10 · 6</span></footer>
+<footer>Pra planejar e acompanhar. Não é consultoria financeira.<br><span style="opacity:.6">versão 06/10 · 2</span></footer>
 </main>
 
 <nav class="bn"><div class="in" role="tablist">
@@ -430,6 +435,7 @@ const DEFAULTS={
          ["Academia",139.9,"cartao"],["RMS (internet)",99.9,"cartao"],["iCloud",19.9,"cartao"],["iFood",9.9,"cartao"],["Amazon",19.9,"cartao"],["Lumberjack (cabelo)",45,"cartao"],["Vivo",75,"cartao"],["Meli+",9.9,"cartao"]],
   fatura:{"2026-10":2866.25,"2026-11":779.88,"2026-12":279.79,"2027-01":279.79,"2027-02":279.79,"2027-03":279.79},
   faturaPaga:{},    // mes -> {conta,valor,data}
+  faturaParc:{},    // mes -> [{id,conta,valor,data}]  pagamentos de um pedaço da fatura
   fixosPagos:{},    // "mes|nome" -> {conta,valor}
   fixoMes:{},       // "mes|nome" -> valor diferente só naquele mês
   cartao:{fecha:28,vence:13,limite:8150}, // cartão Sicredi
@@ -499,6 +505,13 @@ const formaCor=f=>f==="cartao"?"#7B5CF0":(conta(f)?.cor||"#8C82A8");
 
 /* ================= CÁLCULOS ================= */
 const recorrCartao=()=>S.fixos.filter(f=>f[2]==="cartao");
+/* pagamentos da fatura: inteira (faturaPaga) ou em pedaços (faturaParc) */
+function pagtoFat(k,total){
+  const ps=(S.faturaParc||{})[k]||[], pago=Math.round(sum(ps,p=>+p.valor||0)*100)/100;
+  const falta=Math.max(0,Math.round((total-pago)*100)/100);
+  const paga=S.faturaPaga[k]||(ps.length&&falta<0.005?{parcial:true}:null);
+  return {paga,pagos:ps,pagoParc:pago,falta:paga?0:falta};
+}
 const fxV=(f,k)=>{const o=(S.fixoMes||{})[k+"|"+f[0]];return o!=null?+o:(+f[1]||0)}; /* valor do fixo naquele mês */
 const gastosMes=k=>S.gastos.filter(g=>(g.data||"").slice(0,7)===k);
 /* fatura = mês do vencimento. Compra até o dia do fechamento cai na fatura do mês seguinte; depois dele, na de 2 meses depois */
@@ -517,7 +530,7 @@ function faturaDe(k){
   const tatParc=Math.round(sum(parc.filter(p=>ehTattoo(p.g)),p=>p.v)*100)/100; /* compras da tattoo lançadas aqui no cartão */
   const tatAnt=Math.min(compras,Math.round(sum(FR.reembolsos.filter(r=>!String(r.id||"").startsWith("fin_")&&(r.date||"").slice(0,7)===k),r=>+r.value||0)*100)/100); /* o que a tattoo te deve deste mês (já tá dentro das compras da fatura) */
   const tat=Math.round((tatParc+tatAnt)*100)/100;
-  return {compras,comprasPes:Math.round((compras-tatAnt)*100)/100,rec,lanc,lancPes:Math.round((lanc-tatParc)*100)/100,tat,parc,total:Math.round((compras+rec+lanc)*100)/100,paga:S.faturaPaga[k]};
+  return {compras,comprasPes:Math.round((compras-tatAnt)*100)/100,rec,lanc,lancPes:Math.round((lanc-tatParc)*100)/100,tat,parc,total:Math.round((compras+rec+lanc)*100)/100,...pagtoFat(k,compras+rec+lanc)};
 }
 const apFalta=a=>Math.max(0,Math.round(((+a.valor||0)-(+a.pagoValor||0))*100)/100);
 const dividaPai=()=>S.aPagar.filter(a=>a.credor==="pai"&&!a.pago&&apFalta(a)>0.004).sort((x,y)=>(x.mes||"").localeCompare(y.mes||""));
@@ -531,7 +544,7 @@ function pendentes(k){
   if(k<FAT_MESES[0])return out; /* o controle de contas começa em outubro/26 */
   S.fixos.filter(f=>f[2]!=="cartao").forEach(f=>{ if(!S.fixosPagos[k+"|"+f[0]]) out.push({tipo:"fixo",key:k+"|"+f[0],desc:f[0],valor:fxV(f,k),e:"📌",mudou:(S.fixoMes||{})[k+"|"+f[0]]!=null}); });
   S.aPagar.filter(a=>a.mes===k&&!a.pago&&apFalta(a)>0.004).forEach(a=>out.push({tipo:"conta",key:a.id,desc:a.desc+(+a.pagoValor>0?` (falta ${brl(apFalta(a))})`:""),valor:apFalta(a),e:a.credor==="pai"?"👨":"🔧"}));
-  if(FAT_MESES.includes(k)){const fz=faturaDe(k); if(!fz.paga&&fz.total>0) out.push({tipo:"fatura",key:k,desc:"Fatura Sicredi",valor:fz.total,e:"💳"});}
+  if(FAT_MESES.includes(k)){const fz=faturaDe(k); if(!fz.paga&&fz.falta>0) out.push({tipo:"fatura",key:k,desc:fz.pagoParc?"Fatura Sicredi (resto)":"Fatura Sicredi",valor:fz.falta,e:"💳"});}
   return out;
 }
 /* ===== projeção de sobra ===== */
@@ -543,7 +556,7 @@ function mediaDiaDia(){
 function projMes(k){
   const P=S.proj||{}, sal=+P.salario||0, vale=+P.vale||0;
   const med=mediaDiaDia(), dd=P.diaDia!=null?+P.diaDia:(med!=null?med:vale);
-  const fz=faturaDe(k), fat=fz.paga?0:fz.total;
+  const fz=faturaDe(k), fat=fz.paga?0:fz.falta;
   const tatDev=tatDevolve(k), ent2=Math.round((sal+vale+tatDev)*100)/100;
   const fix=sum(S.fixos.filter(f=>f[2]!=="cartao"),f=>fxV(f,k));
   const contas=S.aPagar.filter(a=>a.mes===k&&!a.pago&&apFalta(a)>0.004), ct=sum(contas,apFalta);
@@ -657,13 +670,14 @@ function sheetListaPagar(){
   openSheet(`<div style="display:flex;justify-content:space-between;align-items:center"><h3>Pra pagar</h3><button class="x" data-act="fechar" aria-label="Fechar">×</button></div>
   <div class="monthnav" style="margin:10px 0 4px"><button data-act="listaMes" data-d="-1" aria-label="Mês anterior">‹</button><b>${mfull(curHome)}</b><button data-act="listaMes" data-d="1" aria-label="Próximo mês">›</button></div>
   <div style="font-family:var(--display);font-size:30px;font-weight:800;margin:6px 0 8px" class="num">${brl(pendT)}</div>
-  ${pend.length?pend.map(p=>`<div class="item"><div class="dot" style="background:var(--well)">${p.e}</div>${p.tipo==="fixo"?`<div class="tx" data-act="fxMes" data-n="${esc(p.desc)}" data-k="${curHome}" style="cursor:pointer"><div>${esc(p.desc)} <span class="edpen" aria-hidden="true">✎</span></div><span class="muted">${p.mudou?"Valor ajustado neste mês":"Fixo do mês"}</span></div>`:`<div class="tx"><div>${esc(p.desc)}</div><span class="muted">${p.tipo==="fatura"?(()=>{const ft=faturaDe(p.key).tat;return ft?`Cartão · ${brl(ft)} é da tattoo`:"Cartão"})():"Conta a pagar"}</span></div>`}<span class="val">${brl(p.valor)}</span><button class="btn sm" data-act="pagar" data-t="${p.tipo}" data-k="${esc(p.key)}" data-v="${p.valor}">Pagar</button></div>`).join(""):`<div class="empty">Tudo pago neste mês 🎉</div>`}
+  ${pend.length?pend.map(p=>`<div class="item"><div class="dot" style="background:var(--well)">${p.e}</div>${p.tipo==="fixo"?`<div class="tx" data-act="fxMes" data-n="${esc(p.desc)}" data-k="${curHome}" style="cursor:pointer"><div>${esc(p.desc)} <span class="edpen" aria-hidden="true">✎</span></div><span class="muted">${p.mudou?"Valor ajustado neste mês":"Fixo do mês"}</span></div>`:`<div class="tx"><div>${esc(p.desc)}</div><span class="muted">${p.tipo==="fatura"?(()=>{const fz=faturaDe(p.key),ft=fz.tat;return fz.pagoParc?`Já pago ${brl(fz.pagoParc)}${ft&&fz.falta<=ft+0.004?" · o resto é da tattoo":""}`:ft?`Do teu bolso: <b>${brl(p.valor-ft)}</b> · ${brl(ft)} é da tattoo`:"Cartão"})():"Conta a pagar"}</span></div>`}<span class="val">${brl(p.valor)}</span><button class="btn sm" data-act="pagar" data-t="${p.tipo}" data-k="${esc(p.key)}" data-v="${p.valor}">Pagar</button></div>`).join(""):`<div class="empty">Tudo pago neste mês 🎉</div>`}
   ${pagas.length?`<details style="margin-top:6px"><summary>Já pagas (${pagas.length} · ${brl(sum(pagas,p=>p.valor))})</summary><div style="margin-top:4px">${pagas.map(p=>`<div class="item" style="padding:9px 0;opacity:.75"><div class="dot" style="background:var(--mint-bg)">✓</div><div class="tx"><div style="font-weight:500">${esc(p.desc)}</div><span class="muted">${esc(p.como)}</span></div><span class="val">${brl(p.valor)}</span></div>`).join("")}</div></details>`:""}`);
 }
 function pagosDoMes(k){const out=[];
   S.fixos.filter(f=>f[2]!=="cartao").forEach(f=>{const p=S.fixosPagos[k+"|"+f[0]];if(p)out.push({desc:f[0],valor:+p.valor||+f[1]||0,como:"Fixo · "+(conta(p.conta)?.nome||"")})});
   S.aPagar.filter(a=>a.mes===k&&(a.pago||+a.pagoValor>0)).forEach(a=>out.push({desc:a.desc,valor:+a.pagoValor||+a.valor||0,como:a.pago&&a.pago.conta?"Pago do "+(conta(a.pago.conta)?.nome||""):"Abatido por projeto"}));
   const fp=S.faturaPaga[k]; if(fp)out.push({desc:"Fatura Sicredi",valor:+fp.valor||0,como:"Cartão · "+(conta(fp.conta)?.nome||"")});
+  ((S.faturaParc||{})[k]||[]).forEach(p=>out.push({desc:"Fatura Sicredi (pedaço)",valor:+p.valor||0,como:`${dBR(p.data)} · ${conta(p.conta)?.nome||""}`}));
   return out}
 
 function rGastos(){
@@ -708,14 +722,17 @@ function rFaturas(){
     return `<div class="fslide"><div class="card fat${eAtual?" atual":""}">
     <div class="head"><div><span class="pill ${f.paga?"ok":eAtual?"warn":""}" style="${!f.paga&&!eAtual?"background:var(--well);color:var(--soft)":""}">${f.paga?"Paga":eAtual?"Fatura atual":k<atual?"Anterior":"Próxima"}</span>
       <h3 style="margin-top:8px">${mfull(k)}</h3><div class="muted">vence ${String(S.cartao.vence).padStart(2,"0")}/${k.slice(5)}</div></div>
-      ${f.paga?`<button class="btn sm ghost" data-act="desfazerFat" data-k="${k}">Desfazer</button>`:f.total>0?`<button class="btn sm" data-act="pagar" data-t="fatura" data-k="${k}" data-v="${f.total}">Pagar</button>`:""}</div>
+      ${S.faturaPaga[k]?`<button class="btn sm ghost" data-act="desfazerFat" data-k="${k}">Desfazer</button>`:!f.paga&&f.falta>0?`<button class="btn sm" data-act="pagar" data-t="fatura" data-k="${k}" data-v="${f.falta}">${f.pagoParc?"Pagar resto":"Pagar"}</button>`:""}</div>
     <div class="tot" style="margin-top:6px">${brl(f.total)}</div>
+    ${f.tat?`<div class="bolso"><span>💜 Do teu bolso</span><b class="num">${brl(f.total-f.tat)}</b><small>sem os ${brl(f.tat)} da tattoo</small></div>`:""}
+    ${f.pagos.length?`<div class="pagparc"><div class="pph"><span>Já pago ${brl(f.pagoParc)}</span><b>${f.falta>0.004?`falta ${brl(f.falta)}`:"quitada ✓"}</b></div>
+      ${f.pagos.map(p=>`<div class="ppi"><span>${dBR(p.data)} · ${esc(conta(p.conta)?.nome||"")}</span><span class="num">${brl(p.valor)}</span><button class="del" data-act="desfazerParc" data-k="${k}" data-id="${p.id}" aria-label="Desfazer pagamento">×</button></div>`).join("")}</div>`:""}
     <div class="sbar"><div style="width:${f.comprasPes/t*100}%;background:#7B5CF0"></div><div style="width:${f.rec/t*100}%;background:#F0598F"></div><div style="width:${f.lancPes/t*100}%;background:#D9A011"></div>${f.tat?`<div style="width:${f.tat/t*100}%;background:linear-gradient(90deg,#FF5C9E,#3E7BFF)"></div>`:""}</div>
     <div class="klist"><span><i style="background:#7B5CF0"></i>Compras e parcelas</span><span>${brl(f.comprasPes)}</span>
       <span><i style="background:#F0598F"></i>Recorrentes</span><span>${brl(f.rec)}</span>
       <span><i style="background:#D9A011"></i>Compras novas</span><span>${brl(f.lancPes)}</span>
       ${f.tat?`<span><i style="background:linear-gradient(90deg,#FF5C9E,#3E7BFF)"></i>Da tattoo</span><span>${brl(f.tat)}</span>`:""}</div>
-    ${f.tat?`<div class="fattat"><div><small>Do teu bolso</small><b class="num">${brl(f.total-f.tat)}</b></div><div><small>🖋️ A tattoo cobre</small><b class="num">${brl(f.tat)}</b></div></div>`:""}
+
     ${f.parc.length?`<details><summary>Ver compras novas (${f.parc.length})</summary><div style="margin-top:6px">${f.parc.map(p=>`<div class="item" style="padding:8px 0"><div class="tx"><div style="font-weight:500">${ehTattoo(p.g)?"🖋️ ":""}${esc(p.g.desc||cat(p.g.cat).n)}</div><span class="muted">${dBR(p.g.data)}${p.n>1?` · parcela ${p.i}/${p.n}`:""}</span></div><span class="val">${brl(p.v)}</span></div>`).join("")}</div></details>`:""}
     <details><summary>Ver recorrentes</summary><div style="margin-top:6px">${recorrCartao().map(x=>`<div class="item" style="padding:7px 0"><div class="tx" data-act="fxMes" data-n="${esc(x[0])}" data-k="${k}" style="cursor:pointer"><div style="font-weight:500">${esc(x[0])} <span class="edpen" aria-hidden="true">✎</span></div>${(S.fixoMes||{})[k+"|"+x[0]]!=null?`<span class="muted">ajustado neste mês</span>`:""}</div><span class="val">${brl(fxV(x,k))}</span></div>`).join("")}<p class="muted" style="font-size:12px;margin:6px 0 0">Toque num recorrente pra mudar o valor dele nesta fatura.</p></div></details>
     <details><summary>Editar compras deste mês</summary>
@@ -726,7 +743,7 @@ function rFaturas(){
   const abertas=FAT_MESES.filter(k=>k>=atual&&!faturaDe(k).paga);
   const recAtual=abertas.includes(atual)?faturaDe(atual).rec:0;
   const comprasAb=Math.round(abertas.reduce((t,k)=>{const f=faturaDe(k);return t+f.compras+f.lanc},0)*100)/100;
-  const usado=Math.round((comprasAb+recAtual)*100)/100;
+  const usado=Math.max(0,Math.round((comprasAb+recAtual-sum(abertas,k=>faturaDe(k).pagoParc))*100)/100);
   $("t-faturas").innerHTML=`
   ${lim?(()=>{const pct=Math.max(0,Math.min(1,usado/lim)),r=38,C=2*Math.PI*r,disp=lim-usado,cor=pct>0.8?"#FF7A90":"#6EE7B7";
     return `<div class="limite">
@@ -1129,7 +1146,12 @@ $("sheetBg").addEventListener("click",e=>{if(e.target.id==="sheetBg")closeSheet(
 let payCtx=null, voltarLista=false;
 function sheetPagar(t,k,v){
   payCtx={t,k,v};
-  openSheet(`<h3>Pagar ${brl(v)}</h3><p class="muted">De qual conta sai?</p><div class="stack" style="margin-top:12px">
+  const f=t==="fatura"?faturaDe(k):null;
+  openSheet((f?`<h3>Pagar fatura de ${mshort(k)}</h3>
+  <p class="muted" style="margin:4px 0 0">${f.pagoParc?`Já pagou ${brl(f.pagoParc)} · falta ${brl(f.falta)}`:`Total ${brl(f.falta)}`}</p>
+  <label class="f" style="margin-top:10px">Quanto tu vai pagar agora<input class="bigval" id="payValor" type="text" inputmode="decimal" value="${inV(f.falta)}"></label>
+  <div class="chips" style="margin-top:6px"><button class="chip" data-act="payQuick" data-v="${f.falta}">Tudo · ${brl(f.falta)}</button>${f.tat&&f.falta-f.tat>0.004&&!f.pagoParc?`<button class="chip" style="--c:#7B5CF0" data-act="payQuick" data-v="${Math.round((f.falta-f.tat)*100)/100}">💜 Só o meu · ${brl(f.falta-f.tat)}</button>`:""}</div>
+  <p class="muted" style="margin:10px 0 0">De qual conta sai?</p><div class="stack" style="margin-top:8px">`:`<h3>Pagar ${brl(v)}</h3><p class="muted">De qual conta sai?</p><div class="stack" style="margin-top:12px">`)+`
   ${S.contas.map(c=>`<button class="btn full" style="background:${c.cor};text-align:left;display:flex;justify-content:space-between" data-act="pagarCom" data-c="${c.id}"><span>${esc(c.nome)}</span><span>${brl(c.saldo)}</span></button>`).join("")}
   <button class="btn full ghost" data-act="fechar">Cancelar</button></div>`);
 }
@@ -1194,7 +1216,9 @@ function sheetAjustes(){
 /* ================= AÇÕES ================= */
 function mexeSaldo(id,delta){const c=conta(id);if(c)c.saldo=Math.round(((+c.saldo||0)+delta)*100)/100}
 function pagar(t,k,v,contaId){
-  if(t==="fatura")S.faturaPaga[k]={conta:contaId,valor:v,data:HOJE};
+  if(t==="fatura"){const f=faturaDe(k);
+    if(v>=f.falta-0.004&&!f.pagoParc)S.faturaPaga[k]={conta:contaId,valor:v,data:HOJE};
+    else{(S.faturaParc=S.faturaParc||{})[k]=[...(S.faturaParc[k]||[]),{id:uid(),conta:contaId,valor:Math.min(v,f.falta),data:HOJE}]}}
   else if(t==="fixo")S.fixosPagos[k]={conta:contaId,valor:v};
   else {const a=S.aPagar.find(x=>x.id===k);if(a){a.pagoValor=+a.valor||0;a.pago={conta:contaId,data:HOJE}}}
   mexeSaldo(contaId,-v);
@@ -1330,7 +1354,12 @@ document.addEventListener("click",e=>{
   else if(a==="tarotPago"){const t=S.tarot.find(x=>x.id===b.dataset.id);if(t){t.pago=!tPago(t);commit()}}
   else if(a==="delTarot"){if(!confirma(b,"Apagar esta entrada do tarot?"))return;S.tarot=S.tarot.filter(x=>x.id!==b.dataset.id);commit()}
   else if(a==="pagar"){voltarLista=!!b.closest("#sheet");sheetPagar(b.dataset.t,b.dataset.k,+b.dataset.v)}
-  else if(a==="pagarCom"){pagar(payCtx.t,payCtx.k,payCtx.v,b.dataset.c);closeSheet();commit();toast(`Pago: ${brl(payCtx.v)}`);if(voltarLista)sheetListaPagar()}
+  else if(a==="payQuick"){$("payValor").value=inV(+b.dataset.v)}
+  else if(a==="pagarCom"){let v=payCtx.v;if(payCtx.t==="fatura"){v=num($("payValor").value);const f=faturaDe(payCtx.k);if(v<=0){toast("Coloca o valor");return}if(v>f.falta+0.004){toast(`A fatura só tem ${brl(f.falta)} pra pagar`);return}}
+    pagar(payCtx.t,payCtx.k,v,b.dataset.c);closeSheet();commit();const f2=payCtx.t==="fatura"?faturaDe(payCtx.k):null;
+    toast(f2&&f2.falta>0.004?`Pago ${brl(v)} · falta ${brl(f2.falta)}`:`Pago: ${brl(v)}`);if(voltarLista)sheetListaPagar()}
+  else if(a==="desfazerParc"){const ps=(S.faturaParc||{})[b.dataset.k]||[],p=ps.find(x=>x.id===b.dataset.id);if(!p||!confirma(b,"Desfazer este pagamento? O valor volta pra conta."))return;
+    mexeSaldo(p.conta,+p.valor);S.faturaParc[b.dataset.k]=ps.filter(x=>x!==p);if(!S.faturaParc[b.dataset.k].length)delete S.faturaParc[b.dataset.k];commit()}
   else if(a==="listaPagar"){voltarLista=true;sheetListaPagar()}
   else if(a==="listaMes"){curHome=shiftM(curHome,+b.dataset.d);render();sheetListaPagar()}
   else if(a==="desfazerFat"){const p=S.faturaPaga[b.dataset.k];if(!p||!confirma(b,"Desfazer o pagamento? O valor volta pra conta."))return;mexeSaldo(p.conta,+p.valor);delete S.faturaPaga[b.dataset.k];commit()}

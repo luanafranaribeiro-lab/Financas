@@ -324,7 +324,7 @@ footer{margin-top:30px;font-size:12px;color:var(--soft);text-align:center}
 <div class="tab" id="t-metas"></div>
 <div class="tab" id="t-negocios"></div>
 
-<footer>Pra planejar e acompanhar. Não é consultoria financeira.<br><span style="opacity:.6">versão 06/10 · 4</span></footer>
+<footer>Pra planejar e acompanhar. Não é consultoria financeira.<br><span style="opacity:.6">versão 06/10 · 5</span></footer>
 </main>
 
 <nav class="bn"><div class="in" role="tablist">
@@ -444,6 +444,8 @@ const DEFAULTS={
   tatConta:"sicredi", // onde entram os pagamentos da tattoo feitos pelo Frana
   tatVisto:null,      // quanto de cada reembolso já foi visto (reembolso não mexe mais no banco)
   cliVisto:null,      // quanto de cada tattoo paga pelo cliente já entrou no banco
+  frEspelho:{},       // reembolsos criados no Frana que viraram gasto aqui: id -> {value,date,forma,gasto}
+  frIgnorar:{},       // espelhos que tu apagou aqui (não recriar)
   aPagar:[
     {id:"mec1",credor:"pai",desc:"Mecânico (pai)",valor:250,mes:"2026-10"},
     {id:"mec2",credor:"pai",desc:"Mecânico (pai)",valor:280.87,mes:"2026-10"},
@@ -519,7 +521,7 @@ function primeiraFatura(data){const [y,m,d]=(data||HOJE).split("-").map(Number);
 function parcelasNaFatura(k){
   const out=[];
   S.gastos.filter(g=>g.forma==="cartao").forEach(g=>{
-    const n=Math.max(1,+g.parcelas||1), ini=primeiraFatura(g.data), cent=Math.round((+g.valor||0)*100), base=Math.floor(cent/n);
+    const n=Math.max(1,+g.parcelas||1), ini=g.fatMes||primeiraFatura(g.data), cent=Math.round((+g.valor||0)*100), base=Math.floor(cent/n);
     for(let i=0;i<n;i++){ if(shiftM(ini,i)!==k)continue; const v=(i===n-1?cent-base*(n-1):base)/100; out.push({g,i:i+1,n,v}); }
   });
   return out;
@@ -528,7 +530,7 @@ function faturaDe(k){
   const parc=parcelasNaFatura(k);
   const compras=+S.fatura[k]||0, rec=sum(recorrCartao(),f=>fxV(f,k)), lanc=sum(parc,p=>p.v);
   const tatParc=Math.round(sum(parc.filter(p=>ehTattoo(p.g)),p=>p.v)*100)/100; /* compras da tattoo lançadas aqui no cartão */
-  const tatAnt=Math.min(compras,Math.round(sum(FR.reembolsos.filter(r=>!String(r.id||"").startsWith("fin_")&&(r.date||"").slice(0,7)===k),r=>+r.value||0)*100)/100); /* o que a tattoo te deve deste mês (já tá dentro das compras da fatura) */
+  const tatAnt=Math.min(compras,Math.round(sum(FR.reembolsos.filter(r=>!String(r.id||"").startsWith("fin_")&&!r.forma&&(r.date||"").slice(0,7)===k),r=>+r.value||0)*100)/100); /* o que a tattoo te deve deste mês (já tá dentro das compras da fatura) */
   const tat=Math.round((tatParc+tatAnt)*100)/100;
   return {compras,comprasPes:Math.round((compras-tatAnt)*100)/100,rec,lanc,lancPes:Math.round((lanc-tatParc)*100)/100,tat,parc,total:Math.round((compras+rec+lanc)*100)/100,...pagtoFat(k,compras+rec+lanc)};
 }
@@ -1054,8 +1056,43 @@ document.addEventListener("change",e=>{if(e.target.id==="gData"&&$("parcInfo")){
 document.addEventListener("input",e=>{if(e.target.id!=="tpValor")return;setTimeout(()=>{const v=num(e.target.value);const p=planoAbate(v);
   $("tpPlano").innerHTML=v>0?"Vai abater: "+p.out.map(x=>`${mshort(x.r.date.slice(0,7))} ${brl(x.t)}`).join(" · ")+(p.rest>0?` · sobra ${brl(p.rest)}`:""):"Abate primeiro o mês mais antigo que ainda está pendente."},0)});
 /* pagamentos registrados no Frana viram entrada na conta escolhida */
+/* ===== compras feitas no Frana viram gasto aqui (espelho) =====
+   crédito: entra na fatura do mês do vencimento (date) · débito/Pix: sai da conta na data da compra (date)
+   só pra reembolsos novos com "forma" (os antigos já estavam dentro das compras da fatura) */
+const ESPELHO_DESDE="2026-10-06";
+let FR_OK=false;
+function ehEspelhavel(r){return r&&r.forma&&!String(r.id||"").startsWith("fin_")&&r.origem!=="financas"&&String(r.createdAt||"9999")>=ESPELHO_DESDE}
+function espelharFrana(){
+  S.frEspelho=S.frEspelho||{};S.frIgnorar=S.frIgnorar||{};let mudou=false;const vistos=new Set();
+  const contaDeb=conta("sicredi")?"sicredi":(contasPessoais().find(c=>c.tipo!=="fisico")||S.contas[0]).id;
+  for(const r of FR.reembolsos){
+    if(!ehEspelhavel(r))continue; vistos.add(r.id); if(S.frIgnorar[r.id])continue;
+    const v=Math.round((+r.value||0)*100)/100, cred=r.forma==="credito", snap=S.frEspelho[r.id];
+    const desc=(r.desc||"Compra da tattoo")+(r.origem==="estoque"?" (estoque)":r.origem==="evento"?" (evento)":"");
+    if(!snap){
+      const g={id:uid(),data:cred?(r.compraData||HOJE):(r.date||HOJE),desc,valor:v,cat:TATCAT.n,forma:cred?"cartao":contaDeb,frId:r.id};
+      if(cred)g.fatMes=(r.date||HOJE).slice(0,7);
+      S.gastos.push(g); if(!cred)mexeSaldo(g.forma,-v);
+      if(!cred){const ib=INBOX.find(x=>Math.abs(+x.valor-v)<0.005&&Math.abs(new Date(x.criado_em)-new Date((r.date||HOJE)+"T12:00"))<36*3600e3);if(ib)tirarInbox(ib.id)} /* já veio da Carteira: não deixa pra classificar de novo */
+      S.frEspelho[r.id]={value:v,date:r.date,forma:r.forma,gasto:g.id}; mudou=true; continue;
+    }
+    if(snap.value!==v||snap.date!==r.date||snap.forma!==r.forma){ /* mudou no Frana: ajusta o gasto daqui */
+      const g=S.gastos.find(x=>x.id===snap.gasto);
+      if(g){ if(g.forma!=="cartao")mexeSaldo(g.forma,+g.valor);
+        g.valor=v; if(cred){g.forma="cartao";g.fatMes=(r.date||HOJE).slice(0,7)}else{if(g.forma==="cartao")g.forma=contaDeb;delete g.fatMes;g.data=r.date||g.data}
+        if(g.forma!=="cartao")mexeSaldo(g.forma,-v); }
+      Object.assign(snap,{value:v,date:r.date,forma:r.forma}); mudou=true;
+    }
+  }
+  if(FR_OK) for(const id of Object.keys(S.frEspelho)) if(!vistos.has(id)){ /* apagaram no Frana: tira o gasto daqui */
+    const g=S.gastos.find(x=>x.id===S.frEspelho[id].gasto);
+    if(g){if(g.forma!=="cartao")mexeSaldo(g.forma,+g.valor);S.gastos=S.gastos.filter(x=>x!==g)}
+    delete S.frEspelho[id]; mudou=true;
+  }
+  return mudou;
+}
 function sincTatEntradas(){
-  let mudou=false;
+  let mudou=espelharFrana();
   /* reembolsos: o dinheiro dos clientes já cai no banco, então pagar reembolso é só acerto interno (não mexe em saldo) */
   S.tatVisto=S.tatVisto||{};
   for(const r of FR.reembolsos){const cur=Math.round(tatPago(r)*100)/100;if(S.tatVisto[r.id]!==cur){S.tatVisto[r.id]=cur;mudou=true}}
@@ -1255,10 +1292,11 @@ document.addEventListener("click",e=>{
     if(velho&&ehTattoo(velho)&&FR.reembolsos.some(r=>r.gastoId===velho.id&&tatPago(r)>0)){sheetGasto("Essa compra da tattoo já teve pagamento no Frana, então não dá pra editar aqui. Ajusta lá no Frana.");return}
     const g={id:velho?velho.id:uid(),data:form.data||HOJE,desc:form.desc.trim(),valor:v,cat:form.cat,forma:form.forma};
     if(g.forma==="cartao"&&(form.parcelas||1)>1)g.parcelas=form.parcelas;
+    if(velho&&velho.frId){g.frId=velho.frId;if(velho.fatMes&&g.forma==="cartao")g.fatMes=velho.fatMes} /* veio do Frana: continua ligado, sem criar reembolso novo */
     if(velho){ // desfaz o lançamento antigo e aplica o novo no mesmo lugar
       if(velho.forma!=="cartao")mexeSaldo(velho.forma,+velho.valor);
       S.gastos[S.gastos.indexOf(velho)]=g; if(g.forma!=="cartao")mexeSaldo(g.forma,-v);
-      const muda=ehTattoo(velho)||ehTattoo(g);
+      const muda=!velho.frId&&(ehTattoo(velho)||ehTattoo(g));
       if(muda)(ehTattoo(velho)?apagarReembFrana(velho):Promise.resolve()).then(()=>ehTattoo(g)?criarReembFrana(g):render());
     } else {
       S.gastos.push(g); if(g.forma!=="cartao")mexeSaldo(g.forma,-v);
@@ -1272,7 +1310,7 @@ document.addEventListener("click",e=>{
   else if(a==="editGasto"){const g=S.gastos.find(x=>x.id===b.dataset.id);if(!g)return;
     form={valor:inV(g.valor),desc:g.desc||"",cat:g.cat||"",forma:g.forma,data:g.data,inbox:null,parcelas:g.parcelas||1,edit:g.id};$("sheet").innerHTML="";sheetGasto()}
   else if(a==="delGasto"){const g=S.gastos.find(x=>x.id===b.dataset.id);if(!g||!confirma(b,"Apagar este gasto? O valor volta pro saldo da conta."))return;
-    if(g.forma!=="cartao")mexeSaldo(g.forma,+g.valor);if(ehTattoo(g))apagarReembFrana(g).then(render);S.gastos=S.gastos.filter(x=>x!==g);commit()}
+    if(g.forma!=="cartao")mexeSaldo(g.forma,+g.valor);if(g.frId){(S.frIgnorar=S.frIgnorar||{})[g.frId]=true;delete (S.frEspelho||{})[g.frId]}else if(ehTattoo(g))apagarReembFrana(g).then(render);S.gastos=S.gastos.filter(x=>x!==g);commit()}
   else if(a==="catopen"){catOpen=b.dataset.v||null;rGastos()}
   else if(a==="inbox"){sheetInbox()}
   else if(a==="classificar"){const x=INBOX.find(i=>i.id===b.dataset.id);if(!x)return;
@@ -1452,7 +1490,7 @@ if(PREVIA){
   window.resetPrevia=function(){try{localStorage.removeItem(KEY);localStorage.removeItem("fin-previa-inbox");localStorage.removeItem("fin-previa-frana")}catch(e){}location.reload()};
   let salvo=null; try{salvo=JSON.parse(localStorage.getItem(KEY)||"null")}catch(e){}
   if(salvo)merge(salvo);
-  try{FR=JSON.parse(localStorage.getItem("fin-previa-frana")||"null")||structuredClone(FRANA_PREVIA)}catch(e){FR=structuredClone(FRANA_PREVIA)}
+  try{FR=JSON.parse(localStorage.getItem("fin-previa-frana")||"null")||structuredClone(FRANA_PREVIA)}catch(e){FR=structuredClone(FRANA_PREVIA)} FR_OK=true;
   try{const ib=JSON.parse(localStorage.getItem("fin-previa-inbox")||"null");INBOX=(ib?[...ib,...INBOX_PREVIA.filter(p=>p.id==="ex3"&&!ib.some(x=>x.id==="ex3")&&!localStorage.getItem("fin-previa-ex3"))]:structuredClone(INBOX_PREVIA)).filter(x=>x.id!=="ex2")}catch(e){INBOX=structuredClone(INBOX_PREVIA)}
   ready=true; if(sincTatEntradas())save(); render(); setSave("Prévia");
 }else{
@@ -1468,7 +1506,7 @@ if(PREVIA){
     const r=await sb.from("frana_docs").select("id,col,data").in("col",["reembolsos","tattoos","events"]);
     if(r.error)return;
     const pick=c=>r.data.filter(x=>x.col===c).map(x=>({id:x.id,...x.data}));
-    FR={reembolsos:pick("reembolsos"),tattoos:pick("tattoos"),events:pick("events")};
+    FR={reembolsos:pick("reembolsos"),tattoos:pick("tattoos"),events:pick("events")}; FR_OK=true;
   }
   async function loadInbox(){const r=await sb.from("fin_inbox").select("*").order("criado_em");if(!r.error)INBOX=r.data||[]}
   let conectado=false, USER=null;

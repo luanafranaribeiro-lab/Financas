@@ -242,6 +242,9 @@ nav.bn button[aria-selected="true"]::after{content:"";position:absolute;top:0;le
 .salcard{background:var(--card);border:1.5px solid var(--mint);border-radius:18px;padding:14px;margin-bottom:12px}
 .salcard .st{display:flex;gap:10px;align-items:center}.salcard .st>span{font-size:24px}.salcard b{display:block;font-size:16px}.salcard small{color:var(--soft);font-size:13px}
 .salcard .sr{display:flex;gap:8px;margin:10px 0 6px}.salcard input{flex:1;min-width:0;font:800 20px var(--display);padding:8px 12px;border-radius:12px;border:1.5px solid var(--line);background:var(--well);color:var(--ink)}
+.subt{padding:10px 12px!important;margin:4px -12px;background:var(--violet-bg);border-radius:12px;border:0!important}
+.novaver{position:fixed;left:50%;top:calc(14px + env(safe-area-inset-top,0px));transform:translate(-50%,-140%);z-index:60;display:flex;align-items:center;gap:8px;padding:12px 18px;border:0;border-radius:99px;background:linear-gradient(135deg,#7B5CF0,#EE5C93);color:#fff;font:700 15px var(--body);box-shadow:0 10px 30px rgba(123,92,240,.45);transition:transform .35s cubic-bezier(.2,.9,.3,1.2);cursor:pointer}
+.novaver.on{transform:translate(-50%,0)}.novaver span{font-size:18px}
 /* rings */
 .rings{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
 .ring{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:14px;text-align:center}
@@ -355,7 +358,7 @@ button,a,[data-act]{-webkit-tap-highlight-color:transparent;touch-action:manipul
 <div class="tab" id="t-metas"></div>
 <div class="tab" id="t-negocios"></div>
 
-<footer>Pra planejar e acompanhar. Não é consultoria financeira.<br><span style="opacity:.6">versão 24/10 · 1</span></footer>
+<footer>Pra planejar e acompanhar. Não é consultoria financeira.<br><span style="opacity:.6" id="verTxt">versão 03/11 · 4</span></footer>
 </main>
 
 <nav class="bn"><div class="in" role="tablist">
@@ -595,7 +598,7 @@ function projMes(k){
   const fix=sum(S.fixos.filter(f=>f[2]!=="cartao"),f=>fxV(f,k));
   const contas=S.aPagar.filter(a=>a.mes===k&&!a.pago&&apFalta(a)>0.004), ct=sum(contas,apFalta);
   const mts=S.metas.filter(m=>+m.valorParcela>0&&(+m.pagas||0)<(+m.parcelas||0)), mt=sum(mts,m=>+m.valorParcela);
-  const entra=sal+vale, sai=Math.round((fat+fix+ct+mt+dd)*100)/100;
+  const entra=sal+vale, sai=Math.round((fat+fix+ct+mt)*100)/100; /* só contas certas, sem estimativa */
   return {sal,vale,tatDev,entra:ent2,fat,fatTat:fz.tat,fix,ct,contas,mt,mts,dd,ddAuto:P.diaDia==null,med,sai,sobra:Math.round((ent2-sai)*100)/100};
 }
 /* salário/vale já entraram este mês? (entrada lançada parecida) */
@@ -620,7 +623,7 @@ function restoMesAtual(){ /* o que ainda falta acontecer neste mês: salário/va
   /* pendente se ainda não foi lançado e o dia dele ainda não passou (depois do dia, considera que já tá no saldo) */
   const sal=(!rendaCaiu("sal")&&dia<=(+P.diaSal||5))?(+P.salario||0):0, vale=(!rendaCaiu("vale")&&dia<=(+P.diaVale||15))?(+P.vale||0):0;
   const dd=Math.round(p.dd*Math.max(0,dm-dia)/dm*100)/100;
-  return {sal,vale,dd,total:sal+vale-dd};
+  return {sal,vale,dd,total:sal+vale}; /* dia a dia (estimativa) fica fora do número principal */
 }
 /* quanto a tattoo ainda te deve com vencimento no mês k (no mês atual, inclui o que ficou atrasado) */
 function tatDevolve(k){return Math.round(sum(FR.reembolsos.filter(r=>{const m=(r.date||"").slice(0,7);return k===MES_HOJE?m<=k:m===k}),r=>Math.max(0,(+r.value||0)-tatPago(r)))*100)/100}
@@ -716,7 +719,7 @@ function rInicio(){
     <span class="pc">${pend.length?pend.length+(pend.length===1?" conta":" contas"):"Tudo pago 🎉"} ›</span>
   </button>
   ${(()=>{const pk=curHome>MES_HOJE?curHome:MES_HOJE,ac=projAcum(pk);return `<button class="paybtn" style="border-color:${ac<0?"#F2C4CC":"var(--violet-bg)"}" data-act="projecao">
-    <span class="pi" style="background:var(--violet-bg)">📈</span><span class="pt"><small>Tu termina ${mshort(pk)} com</small><b style="color:${ac<0?"var(--bad)":"inherit"}">${brl(ac)}</b></span>
+    <span class="pi" style="background:var(--violet-bg)">📈</span><span class="pt"><small>Depois das contas de ${mshort(pk)}</small><b style="color:${ac<0?"var(--bad)":"inherit"}">${brl(ac)}</b></span>
     <span class="pc" style="color:var(--violet)">ver conta ›</span></button>`})()}
   </div></div>
   <h2>Metas</h2>
@@ -1027,19 +1030,33 @@ function sheetProjecao(){
   const ln=(l,v,cls="")=>`<div class="item" style="padding:8px 0"><div class="tx">${l}</div><span class="val num ${cls}">${v}</span></div>`;
   openSheet(`<div style="display:flex;justify-content:space-between;align-items:center"><h3>📈 Projeção</h3><button class="x" data-act="fechar" aria-label="Fechar">×</button></div>
   <div class="monthnav" style="margin-top:8px"><button data-act="projM" data-d="-1" ${projK<=MES_HOJE?"disabled style='opacity:.3'":""} aria-label="Mês anterior">‹</button><b>${mfull(projK)}</b><button data-act="projM" data-d="1" aria-label="Próximo mês">›</button></div>
-  <div class="projbig ${ac<0?"neg":""}"><small>Tu termina ${mshort(projK)} com uns</small><b class="num">${brl(ac)}</b><span>sem contar o que a tattoo ainda te deve</span></div>
-  <div class="parcbox" style="margin-top:10px;font-size:14px;display:flex;justify-content:space-between;align-items:center;gap:10px"><span>Só no mês de ${mshort(projK)}: entra ${brl(p.entra)}, sai ${brl(p.sai)}</span><b class="num" style="white-space:nowrap;color:${p.sobra<0?"var(--bad)":"var(--mint)"}">${p.sobra<0?"−":"+"}${brl(Math.abs(p.sobra))}</b></div>
-  <div class="card" style="margin-top:10px">
-    <div class="muted" style="font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:.04em">Entra</div>
-    ${ln("💼 Salário",brl(p.sal))}${ln("🍽️ Vale (Swile)",brl(p.vale))}${p.tatDev?`<div class="item" style="padding:8px 0;opacity:.6"><div class="tx">🖋️ Tattoo te deve <span class="muted" style="font-size:12px">(não conta: entra no saldo quando ela pagar)</span></div><span class="val num" style="text-decoration:line-through">${brl(p.tatDev)}</span></div>`:""}
-    <div class="muted" style="font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:.04em;margin-top:10px">Sai</div>
-    ${ln(`💳 Fatura Sicredi${p.fat?(p.fatTat?` <span class="muted" style="font-size:12px">(${brl(p.fatTat)} é da tattoo)</span>`:""):" (paga)"}`,brl(p.fat))}
-    ${ln("📌 Fixos fora do cartão",brl(p.fix))}
-    ${p.contas.map(a=>ln(`${a.credor==="pai"?"👨":"🔧"} ${esc(a.desc)}`,brl(apFalta(a)))).join("")}
-    ${p.mts.map(m=>ln(`${m.e} Parcela ${esc(m.nome)}`,brl(+m.valorParcela))).join("")}
-    ${ln(`🛒 Dia a dia <span class="muted" style="font-size:12px">(${p.ddAuto?(p.med!=null?"média dos últimos meses":"estimado pelo vale"):"valor que tu definiu"})</span>`,brl(p.dd))}
-  </div>
-  ${(()=>{const r=restoMesAtual();return `<p class="muted" style="font-size:12px;margin:8px 0 0">"Termina com" = o que tu tem hoje − o que ainda falta pagar em ${mshort(MES_HOJE)}${r.sal||r.vale?` + ${r.sal&&r.vale?"salário e vale":r.sal?"salário":"vale"} que ainda não ${r.sal&&r.vale?"foram lançados":"foi lançado"} em ${mshort(MES_HOJE)}`:""} − o dia a dia dos dias que faltam + o que sobra (ou falta) em cada mês até ${mshort(projK)}.</p>`})()}
+  <div class="projbig ${ac<0?"neg":""}"><small>Depois de pagar todas as contas de ${mshort(projK)}</small><b class="num">${brl(ac)}</b><span>sem estimativas · sem contar o que a tattoo te deve</span></div>
+  ${(()=>{ /* passo a passo: de onde sai o número */
+    const passos=[]; let ini, iniLbl;
+    if(projK===MES_HOJE){
+      ini=Math.round((saldoVirtual()+saldoFisico())*100)/100; iniLbl="Tu tem hoje nas tuas contas";
+      const r=restoMesAtual(), dia=+HOJE.slice(8,10), [y,m]=MES_HOJE.split("-").map(Number), falta=new Date(y,m,0).getDate()-dia;
+      if(r.sal)passos.push(["💼 Salário que ainda vai cair",r.sal]);
+      if(r.vale)passos.push(["🍽️ Vale que ainda vai cair",r.vale]);
+      pendentes(MES_HOJE).forEach(x=>passos.push([`${x.e} ${esc(x.tipo==="fatura"?"Fatura Sicredi (falta pagar)":x.desc)}`,-x.valor]));
+      passos.push(["SUB"]);
+    } else {
+      const ant=shiftM(projK,-1); ini=projAcum(ant); iniLbl=`Sobra do fim de ${mshort(ant)}`;
+      passos.push(["💼 Salário",p.sal],["🍽️ Vale (Swile)",p.vale]);
+      if(p.fat)passos.push([`💳 Fatura Sicredi${p.fatTat?` <span class="muted" style="font-size:12px">(${brl(p.fatTat)} é da tattoo)</span>`:""}`,-p.fat]);
+      if(p.fix)passos.push(["📌 Fixos fora do cartão",-p.fix]);
+      p.contas.forEach(a=>passos.push([`${a.credor==="pai"?"👨":"🔧"} ${esc(a.desc)}`,-apFalta(a)]));
+      p.mts.forEach(m=>passos.push([`${m.e} Parcela ${esc(m.nome)}`,-(+m.valorParcela)]));
+      passos.push(["SUB"]);
+    }
+    const row=(l,v)=>`<div class="item" style="padding:8px 0"><div class="tx">${l}</div><span class="val num" style="color:${v<0?"var(--bad)":"var(--mint)"};white-space:nowrap">${v<0?"− ":"+ "}${brl(Math.abs(v))}</span></div>`;
+    return `<div class="card" style="margin-top:10px">
+      <div class="muted" style="font-size:13px;margin-bottom:4px">Como chega nesse número:</div>
+      <div class="item" style="padding:8px 0"><div class="tx"><b>${iniLbl}</b></div><span class="val num" style="white-space:nowrap"><b>${brl(ini)}</b></span></div>
+      ${(()=>{let run=ini;return passos.map(([l,v])=>{if(l==="SUB")return `<div class="item subt"><div class="tx"><b>= Fica contigo depois de pagar todas as contas</b></div><span class="val num" style="white-space:nowrap;color:${run<0?"var(--bad)":"inherit"}"><b>${brl(run)}</b></span></div>`;run+=v;return row(l,v)}).join("")})()}
+            ${(()=>{const dd=projK===MES_HOJE?restoMesAtual().dd:p.dd;return dd?`<div class="item" style="padding:8px 0;opacity:.6"><div class="tx">🛒 Dia a dia <span class="muted" style="font-size:12px">(fora da conta: mercado, gasolina… sai do que sobra. Média: uns ${brl(dd)}${projK===MES_HOJE?" até o fim do mês":" por mês"})</span></div><span class="val num" style="text-decoration:line-through">${brl(dd)}</span></div>`:""})()}
+      ${p.tatDev?`<div class="item" style="padding:8px 0;opacity:.6"><div class="tx">🖋️ Tattoo te deve <span class="muted" style="font-size:12px">(fora da conta: entra no saldo quando ela pagar)</span></div><span class="val num" style="text-decoration:line-through">${brl(p.tatDev)}</span></div>`:""}
+    </div>`})()}
   <details style="margin-top:12px" ${projOpen?"open":""}><summary style="font-weight:700;color:var(--violet)">Ajustar valores</summary>
     <div class="stack" style="margin-top:8px">
       <label class="f">Salário líquido<input type="text" inputmode="decimal" data-proj="salario" value="${inV(p.sal)}"></label>
@@ -1232,6 +1249,12 @@ function sheetEmpPai(){
     <button class="btn full" style="font-size:16px;padding:15px" data-act="addEmpPai">Salvar empréstimo</button></div>`);
 }
 const lerEmp=()=>{if($("epValor"))pForm.emp={...pForm.emp,valor:$("epValor").value,desc:$("epDesc").value,mes:$("epMes").value}};
+/* aviso quando abre uma versão nova do app */
+function avisoVersao(){try{const v=($("verTxt")?.textContent||"").replace("versão ","").trim(),k="fin-versao",ant=localStorage.getItem(k);
+  localStorage.setItem(k,v); if(!ant||ant===v)return;
+  const el=document.createElement("button");el.className="novaver";el.innerHTML=`<span>✨</span><b>App atualizado!</b>`;el.onclick=()=>el.remove();
+  document.body.appendChild(el);setTimeout(()=>el.classList.add("on"),50);setTimeout(()=>{el.classList.remove("on");setTimeout(()=>el.remove(),400)},4500)}catch(e){}}
+setTimeout(avisoVersao,600);
 function toast(t){let el=$("toast");if(!el){el=document.createElement("div");el.id="toast";el.style.cssText="pointer-events:none;position:fixed;left:50%;bottom:calc(84px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--paper);padding:12px 18px;border-radius:14px;font-weight:600;font-size:14px;z-index:60;box-shadow:0 8px 24px rgba(0,0,0,.2);transition:opacity .3s";document.body.appendChild(el)}
   el.textContent=t;el.style.opacity="1";clearTimeout(el._t);el._t=setTimeout(()=>el.style.opacity="0",2200)}
 function openSheet(html){$("sheet").innerHTML=html;$("sheetBg").classList.add("on")}

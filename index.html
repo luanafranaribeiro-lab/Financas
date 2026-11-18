@@ -363,7 +363,7 @@ button,a,[data-act]{-webkit-tap-highlight-color:transparent;touch-action:manipul
 <div class="tab" id="t-metas"></div>
 <div class="tab" id="t-negocios"></div>
 
-<footer>Pra planejar e acompanhar. Não é consultoria financeira.<br><span style="opacity:.6" id="verTxt">versão 18/11 · 1</span></footer>
+<footer>Pra planejar e acompanhar. Não é consultoria financeira.<br><span style="opacity:.6" id="verTxt">versão 18/11 · 2</span></footer>
 </main>
 
 <nav class="bn"><div class="in" role="tablist">
@@ -666,7 +666,7 @@ function porCategoria(k){
   return Object.entries(m).sort((a,b)=>b[1]-a[1]);
 }
 function metaInfo(m){
-  const alvo=+m.alvo||0, tenho=+m.tenho||0, emp=+m.emprestado||0, n=+m.parcelas||0, vp=+m.valorParcela||0, pg=Math.min(+m.pagas||0,n);
+  const cv=m.conta&&conta(m.conta), alvo=+m.alvo||0, tenho=cv?(+cv.saldo||0):(+m.tenho||0), emp=+m.emprestado||0, n=+m.parcelas||0, vp=+m.valorParcela||0, pg=Math.min(+m.pagas||0,n);
   const totalFin=n*vp, juros=totalFin>0&&emp>0?totalFin-emp:0, restante=(n-pg)*vp;
   const disp=tenho+emp;                         /* o que eu tenho pra usar, com empréstimo */
   const pct=alvo>0?Math.min(1,disp/alvo):(n>0?pg/n:0);
@@ -843,17 +843,22 @@ function rMetas(){
       <button class="x" data-act="delMeta" data-i="${i}" aria-label="Apagar meta">×</button></div>
     ${x.alvo?`<div class="mbar"><div style="width:${x.pOwn*100}%;background:${m.c||"#7B5CF0"}"></div><div style="width:${x.pEmp*100}%;background:${m.c||"#7B5CF0"};opacity:.35"></div></div>
     <div class="mleg"><span><i style="background:${m.c||"#7B5CF0"}"></i>Meu ${brl0(x.tenho)}</span><span><i style="background:${m.c||"#7B5CF0"};opacity:.35"></i>Emprestado ${brl0(x.emp)}</span><span>Custo ${brl0(x.alvo)}</span></div>`:""}
-    <div class="facts"><div>Tenho<b>${brl0(x.tenho)}</b></div><div>Peguei emprestado<b>${brl0(x.emp)}</b></div><div>Parcela<b>${x.n?x.n+"x "+brl0(x.vp):"—"}</b></div>
+    <div class="facts"><div>Tenho${m.conta&&conta(m.conta)?` <span style="font-size:11px;opacity:.75">· ${esc(conta(m.conta).nome)}</span>`:""}<b>${brl0(x.tenho)}</b></div><div>Peguei emprestado<b>${brl0(x.emp)}</b></div><div>Parcela<b>${x.n?x.n+"x "+brl0(x.vp):"—"}</b></div>
       <div>Total a pagar<b>${brl0(x.totalFin)}</b></div><div>Juros<b style="color:${x.juros>0?"var(--bad)":"var(--ink)"}">${brl0(x.juros)}</b></div><div>Falta pagar<b>${brl0(x.restante)}</b></div></div>
     ${x.n?`<div class="muted">${x.pg} de ${x.n} parcelas pagas</div><div class="pbar"><div style="width:${x.pg/x.n*100}%;background:${m.c||"#7B5CF0"}"></div></div>`:""}
-    <details><summary>Editar valores</summary><div class="grid2" style="margin-top:10px">
+    <details ${metaAberta===i?"open":""}><summary>Editar valores</summary><div class="grid2" style="margin-top:10px">
       <label class="f">Quanto custa<input type="text" inputmode="decimal" data-mt="${i}" data-f="alvo" value="${inV0(m.alvo)}"></label>
-      <label class="f">Já tenho<input type="text" inputmode="decimal" data-mt="${i}" data-f="tenho" value="${inV0(m.tenho)}"></label>
+      ${m.conta&&conta(m.conta)?`<label class="f">Já tenho<div style="padding:8px 0;font:700 16px var(--body);color:var(--ink)">${brl(conta(m.conta).saldo)}<span class="muted" style="display:block;font-weight:500;font-size:12px">saldo de ${esc(conta(m.conta).nome)}</span></div></label>`:`<label class="f">Já tenho<input type="text" inputmode="decimal" data-mt="${i}" data-f="tenho" value="${inV0(m.tenho)}"></label>`}
       <label class="f">Peguei emprestado<input type="text" inputmode="decimal" data-mt="${i}" data-f="emprestado" value="${inV0(m.emprestado)}"></label>
       <label class="f">Nº de parcelas<input type="text" inputmode="numeric" data-mt="${i}" data-f="parcelas" value="${+m.parcelas||""}"></label>
       <label class="f">Valor da parcela<input type="text" inputmode="decimal" data-mt="${i}" data-f="valorParcela" value="${inV0(m.valorParcela)}"></label>
       <label class="f">Parcelas pagas<input type="text" inputmode="numeric" data-mt="${i}" data-f="pagas" value="${+m.pagas||""}"></label>
-    </div></details>
+    </div>
+    <div style="margin-top:12px"><span class="muted" style="font-weight:600">O "já tenho" vem de qual conta?</span><div class="chips">
+      <button class="chip" aria-pressed="${!m.conta}" data-act="metaConta" data-i="${i}" data-v="">✍️ Digito eu</button>
+      ${S.contas.filter(c=>!c.negocio).map(c=>`<button class="chip" style="--c:${c.cor}" aria-pressed="${m.conta===c.id}" data-act="metaConta" data-i="${i}" data-v="${c.id}">${esc(c.nome)}</button>`).join("")}</div>
+      <p class="muted" style="margin:6px 0 0;font-size:12px">Ligada a uma conta, a meta acompanha o saldo dela sozinha. Bom pra uma conta só da reserva.</p></div>
+    </details>
   </div>`}).join("")}
   <button class="add" data-act="addMeta">+ Nova meta</button>`;
 }
@@ -1092,7 +1097,7 @@ function sheetFixoMes(nome,k){
   </div>`);
 }
 function fecharFixoMes(){const volta=fxCtx&&fxCtx.volta;fxCtx=null;commit();if(volta==="lista")sheetListaPagar();else closeSheet()}
-let ctForm=null;
+let ctForm=null; var metaAberta=null;
 const CORES_CONTA=["#2E9E5B","#009EE3","#F0598F","#2F95B8","#7B5CF0","#D9A011","#F27A45","#56657A","#D8435F","#14A38B"];
 function sheetConta(){
   const f=ctForm, ed=f.i!=null;
@@ -1477,6 +1482,7 @@ document.addEventListener("click",e=>{
     const c=conta("sicredi")?"sicredi":(contasPessoais()[0]||S.contas[0]).id;
     S.entradas.push({id:uid(),data:HOJE,desc:"Salário",valor:v,conta:c,renda:"sal"});mexeSaldo(c,v);(S.rendaFeita=S.rendaFeita||{})[MES_HOJE+"|sal"]=true;commit();save();toast(`Salário de ${brl(v)} lançado`)}
   else if(a==="salJa"){(S.rendaFeita=S.rendaFeita||{})[MES_HOJE+"|sal"]=true;commit()}
+  else if(a==="metaConta"){const m=S.metas[+b.dataset.i];if(!m)return;m.conta=b.dataset.v||null;if(!m.conta&&b.dataset.v==="")delete m.conta;metaAberta=+b.dataset.i;commit();toast(m.conta?`Meta ligada a ${conta(m.conta).nome}`:"Meta sem conta: tu digita o valor")}
   else if(a==="novaConta"){ctForm={nome:"",tipo:"invest",cor:CORES_CONTA[4],saldo:""};$("sheet").innerHTML="";sheetConta();setTimeout(()=>$("ctNome")?.focus(),50)}
   else if(a==="editConta"){const c=S.contas[+b.dataset.i];if(!c)return;ctForm={i:+b.dataset.i,nome:c.nome,tipo:c.tipo==="fisico"?"fisico":c.tipo==="invest"?"invest":"virtual",cor:c.cor,podeApagar:!!c.criada};$("sheet").innerHTML="";sheetConta()}
   else if(a==="ctTipo"){ctForm.tipo=b.dataset.v;sheetConta()}

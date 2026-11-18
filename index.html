@@ -282,6 +282,11 @@ button:focus-visible{outline:2px solid var(--violet);outline-offset:2px}
 .bank .t{font-size:12px;opacity:.8}
 .bank input{width:100%;margin-top:12px;background:transparent;border:0;border-bottom:1.5px solid rgba(255,255,255,.4);border-radius:0;outline:none;color:#fff;font:800 22px var(--display);padding:6px 10px;position:relative;z-index:1}
 .bank input::placeholder{color:rgba(255,255,255,.7)}
+.bedit{position:absolute;top:10px;right:10px;z-index:2;width:30px;height:30px;border-radius:50%;border:0;background:rgba(255,255,255,.2);color:#fff;font-size:14px;cursor:pointer}
+.bnova{background:transparent;border:2px dashed var(--line);color:var(--soft);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font:700 15px var(--body);cursor:pointer}
+.bnova::after{display:none}.bnova span{font-size:24px;color:var(--violet)}.bnova small{font-weight:500;font-size:12px}
+.hguard{position:relative;z-index:1;margin-top:10px;display:flex;justify-content:space-between;align-items:center;font-size:13px;font-weight:600;padding:9px 12px;border-radius:14px;background:rgba(255,255,255,.12)}
+.hguard b{font-family:var(--display);font-size:16px}
 
 /* faturas */
 .fat{margin-bottom:12px}
@@ -358,7 +363,7 @@ button,a,[data-act]{-webkit-tap-highlight-color:transparent;touch-action:manipul
 <div class="tab" id="t-metas"></div>
 <div class="tab" id="t-negocios"></div>
 
-<footer>Pra planejar e acompanhar. Não é consultoria financeira.<br><span style="opacity:.6" id="verTxt">versão 03/11 · 4</span></footer>
+<footer>Pra planejar e acompanhar. Não é consultoria financeira.<br><span style="opacity:.6" id="verTxt">versão 18/11 · 1</span></footer>
 </main>
 
 <nav class="bn"><div class="in" role="tablist">
@@ -636,7 +641,8 @@ function projAcum(k){ /* saldo hoje − o que falta pagar este mês + o resto de
   for(let m=shiftM(MES_HOJE,1);m<=k;m=shiftM(m,1))v+=projMes(m).sobra;
   return Math.round(v*100)/100;
 }
-const contasPessoais=()=>S.contas.filter(c=>!c.negocio);
+const contasPessoais=()=>S.contas.filter(c=>!c.negocio&&c.tipo!=="invest");
+const contasInvest=()=>S.contas.filter(c=>c.tipo==="invest");
 const saldoVirtual=()=>sum(contasPessoais().filter(c=>c.tipo!=="fisico"),c=>c.saldo);
 const saldoFisico=()=>sum(contasPessoais().filter(c=>c.tipo==="fisico"),c=>c.saldo);
 /* selinho da conta: iniciais na cor dela */
@@ -697,7 +703,8 @@ const monthNav=(k,id)=>`<div class="monthnav"><button data-act="mes" data-w="${i
 const heroContas=()=>(()=>{const cs=contasPessoais(), pos=cs.filter(c=>+c.saldo>0), tp=sum(pos,c=>+c.saldo)||1;
       const sub=c=>c.tipo==="fisico"?"na carteira":c.id==="swile"?"vale":"conta";
       return `<div class="hbar" role="img" aria-label="Divisão do saldo entre as contas">${pos.map(c=>`<i style="width:${(+c.saldo/tp*100).toFixed(2)}%;background:${c.cor}"></i>`).join("")}</div>
-      <div class="hcontas">${cs.map(c=>`<div class="hc">${selo(c,12)}<span class="hn">${c.tipo==="fisico"?"Físico":esc(c.nome)}<small>${sub(c)}</small></span><b class="num">${brl(c.saldo)}</b></div>`).join("")}</div>`})();
+      <div class="hcontas">${cs.map(c=>`<div class="hc">${selo(c,12)}<span class="hn">${c.tipo==="fisico"?"Físico":esc(c.nome)}<small>${sub(c)}</small></span><b class="num">${brl(c.saldo)}</b></div>`).join("")}</div>
+      ${contasInvest().length?`<div class="hguard">🐷 Guardado em investimentos <b class="num">${brl(sum(contasInvest(),c=>+c.saldo||0))}</b></div>`:""}`})();
 function rInicio(){
   const virt=saldoVirtual(), fis=saldoFisico(), pend=pendentes(curHome), pendT=sum(pend,p=>p.valor);
   const gTot=sum(gastosPessoais(curHome),g=>g.valor), tarT=sum(S.tarot,t=>t.valor), ts=tatSaldo(), deve=tatDeve(curHome);
@@ -763,8 +770,9 @@ function rBancos(){
   <div class="hero" style="margin-top:6px"><small>Total nas tuas contas</small><div class="big">${brl(saldoVirtual()+saldoFisico())}</div>
     ${heroContas()}</div>
   <h2>Contas</h2>
-  <div class="banks">${S.contas.map((c,i)=>`<div class="bank" style="background:linear-gradient(145deg,${c.cor},${c.cor}cc)"><div style="display:flex;align-items:center;gap:8px">${selo(c,14)}<div><div class="n">${esc(c.nome)}</div><div class="t">${c.negocio?"Da tattoo · fora do teu saldo":c.tipo==="fisico"?"Físico":"Virtual"}</div></div></div>
-    <input type="text" inputmode="decimal" data-saldo="${i}" value="${inV(c.saldo)}" aria-label="Saldo ${esc(c.nome)}"></div>`).join("")}</div>
+  <div class="banks">${S.contas.map((c,i)=>`<div class="bank" style="background:linear-gradient(145deg,${c.cor},${c.cor}cc)"><div style="display:flex;align-items:center;gap:8px">${selo(c,14)}<div><div class="n">${esc(c.nome)}</div><div class="t">${c.negocio?"Da tattoo · fora do teu saldo":c.tipo==="invest"?"Investimento · guardado":c.tipo==="fisico"?"Físico":"Virtual"}</div></div></div>
+    <input type="text" inputmode="decimal" data-saldo="${i}" value="${inV(c.saldo)}" aria-label="Saldo ${esc(c.nome)}"><button class="bedit" data-act="editConta" data-i="${i}" aria-label="Editar ${esc(c.nome)}">✎</button></div>`).join("")}
+    <button class="bank bnova" data-act="novaConta"><span>＋</span>Nova conta<small>CDB, poupança, caixinha…</small></button></div>
   <button class="btn full ghost" style="margin-top:4px;font-size:15px;padding:13px" data-act="novaTransf">⇄ Depositar ou transferir</button>
   <p class="muted">Toque no valor pra ajustar o saldo. Os gastos e pagamentos descontam da conta escolhida sozinhos.</p>
   ${(S.transf||[]).length?`<h2>Transferências</h2><div class="card">${[...S.transf].sort((a,b)=>(b.data||"").localeCompare(a.data||"")).slice(0,10).map(t=>`<div class="item"><div class="dot" style="background:var(--violet-bg)">⇄</div><div class="tx"><div>${esc(conta(t.de)?.nome||"?")} → ${esc(conta(t.para)?.nome||"?")}</div><span class="muted">${dBR(t.data)}${t.desc?" · "+esc(t.desc):""}</span></div><span class="val num">${brl(t.valor)}</span><button class="del" data-act="delTransf" data-id="${t.id}" aria-label="Apagar transferência">×</button></div>`).join("")}</div>`:""}
@@ -1084,6 +1092,23 @@ function sheetFixoMes(nome,k){
   </div>`);
 }
 function fecharFixoMes(){const volta=fxCtx&&fxCtx.volta;fxCtx=null;commit();if(volta==="lista")sheetListaPagar();else closeSheet()}
+let ctForm=null;
+const CORES_CONTA=["#2E9E5B","#009EE3","#F0598F","#2F95B8","#7B5CF0","#D9A011","#F27A45","#56657A","#D8435F","#14A38B"];
+function sheetConta(){
+  const f=ctForm, ed=f.i!=null;
+  const nome=$("ctNome")?$("ctNome").value:f.nome, sal=$("ctSaldo")?$("ctSaldo").value:f.saldo;
+  openSheet(`<div style="display:flex;justify-content:space-between;align-items:center"><h3>${ed?"Editar conta":"Nova conta"}</h3><button class="x" data-act="fechar" aria-label="Fechar">×</button></div>
+  <div class="stack" style="margin-top:10px">
+    <label class="f">Nome<input id="ctNome" placeholder="Ex.: CDB Sicredi, Caixinha Nubank" value="${esc(nome||"")}"></label>
+    <div><span class="muted" style="font-weight:600">Tipo</span><div class="chips">
+      ${[["virtual","🏦 Conta"],["invest","🐷 Investimento"],["fisico","💵 Dinheiro"]].map(([v,l])=>`<button class="chip" aria-pressed="${f.tipo===v}" data-act="ctTipo" data-v="${v}">${l}</button>`).join("")}</div>
+      ${f.tipo==="invest"?`<p class="muted" style="margin:6px 0 0;font-size:12px">Investimento fica guardado: aparece no total "Guardado", mas não conta no dinheiro do dia a dia nem na projeção.</p>`:""}</div>
+    ${ed?"":`<label class="f">Quanto tem nela agora<input id="ctSaldo" type="text" inputmode="decimal" placeholder="0,00" value="${esc(sal||"")}"></label>`}
+    <div><span class="muted" style="font-weight:600">Cor</span><div class="swatches">${CORES_CONTA.map(x=>`<button data-act="ctCor" data-v="${x}" aria-label="Cor" aria-pressed="${f.cor===x}" style="background:${x};width:30px;height:30px;border-radius:50%;border:3px solid ${f.cor===x?"var(--ink)":"transparent"}"></button>`).join("")}</div></div>
+    <button class="btn full" style="font-size:16px;padding:15px" data-act="ctSalvar">${ed?"Salvar":"Criar conta"}</button>
+    ${ed&&f.podeApagar?`<button class="del" data-act="ctApagar">Apagar esta conta</button>`:""}
+  </div>`);
+}
 let trForm={};
 function sheetTransf(msg=""){
   const v=$("trValor")?.value||"", d=$("trDesc")?.value||"", dt=$("trData")?.value||HOJE;
@@ -1452,6 +1477,15 @@ document.addEventListener("click",e=>{
     const c=conta("sicredi")?"sicredi":(contasPessoais()[0]||S.contas[0]).id;
     S.entradas.push({id:uid(),data:HOJE,desc:"Salário",valor:v,conta:c,renda:"sal"});mexeSaldo(c,v);(S.rendaFeita=S.rendaFeita||{})[MES_HOJE+"|sal"]=true;commit();save();toast(`Salário de ${brl(v)} lançado`)}
   else if(a==="salJa"){(S.rendaFeita=S.rendaFeita||{})[MES_HOJE+"|sal"]=true;commit()}
+  else if(a==="novaConta"){ctForm={nome:"",tipo:"invest",cor:CORES_CONTA[4],saldo:""};$("sheet").innerHTML="";sheetConta();setTimeout(()=>$("ctNome")?.focus(),50)}
+  else if(a==="editConta"){const c=S.contas[+b.dataset.i];if(!c)return;ctForm={i:+b.dataset.i,nome:c.nome,tipo:c.tipo==="fisico"?"fisico":c.tipo==="invest"?"invest":"virtual",cor:c.cor,podeApagar:!!c.criada};$("sheet").innerHTML="";sheetConta()}
+  else if(a==="ctTipo"){ctForm.tipo=b.dataset.v;sheetConta()}
+  else if(a==="ctCor"){ctForm.cor=b.dataset.v;sheetConta()}
+  else if(a==="ctSalvar"){const nome=$("ctNome").value.trim();if(!nome){$("ctNome").focus();toast("Dá um nome pra conta");return}
+    if(ctForm.i!=null){const c=S.contas[ctForm.i];Object.assign(c,{nome,tipo:ctForm.tipo,cor:ctForm.cor});closeSheet();commit();toast("Conta atualizada");return}
+    let id=nome.toLowerCase().normalize("NFD").replace(/[^a-z0-9]+/g,"")||"conta";while(conta(id))id+=Math.floor(Math.random()*10);
+    S.contas.push({id,nome,tipo:ctForm.tipo,cor:ctForm.cor,saldo:num($("ctSaldo").value)||0,criada:true});closeSheet();commit();toast(`${nome} criada`)}
+  else if(a==="ctApagar"){const c=S.contas[ctForm.i];if(!c||!confirma(b,`Apagar ${c.nome}? O saldo dela some do app.`))return;S.contas.splice(ctForm.i,1);closeSheet();commit();toast("Conta apagada")}
   else if(a==="novaTransf"){const f=S.contas.find(c=>c.tipo==="fisico"),vt=S.contas.find(c=>c.tipo!=="fisico");trForm={de:(f||S.contas[0]).id,para:(vt||S.contas[1]||S.contas[0]).id};$("sheet").innerHTML="";sheetTransf();setTimeout(()=>$("trValor")?.focus(),50)}
   else if(a==="trConta"){const lado=b.dataset.lado,out=lado==="de"?"para":"de";if(trForm[out]===b.dataset.v)trForm[out]=trForm[lado];trForm[lado]=b.dataset.v;sheetTransf()}
   else if(a==="addTransf"){const v=num($("trValor").value);if(v<=0){$("trValor").focus();toast("Coloque o valor");return}
